@@ -7,7 +7,7 @@ import "Theme.js" as Theme
 
 BarWidget {
   id: root
-  moduleName: "eso.server-status"
+  moduleName: "murankar.eso-server-status"
 
   readonly property string icon: ""
 
@@ -15,7 +15,7 @@ BarWidget {
   // interval for the whole shell rather than one per bar surface.
   readonly property var service: {
     var api = root.bar ? root.bar.shell : null
-    return api ? api.serviceFor("eso.server-status") : null
+    return api ? api.serviceFor("murankar.eso-server-status") : null
   }
 
   readonly property string status: service ? service.status : ""
