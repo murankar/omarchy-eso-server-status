@@ -30,7 +30,7 @@ the website's own page uses. No API key is required.
 ### Recommended: managed install, updates with `omarchy plugin update`
 
 ```bash
-omarchy plugin add https://github.com/YOUR-ACCOUNT/omarchy-eso-server-status.git --enable
+omarchy plugin add https://gitlab.com/YOUR-ACCOUNT/omarchy-eso-server-status.git --enable
 ```
 
 `omarchy plugin add` clones the repo into `~/.config/omarchy/plugins/eso.server-status/`,
@@ -75,7 +75,7 @@ omarchy plugin remove eso.server-status
 For working on the plugin, or if you prefer to manage it yourself:
 
 ```bash
-git clone https://github.com/YOUR-ACCOUNT/omarchy-eso-server-status.git \
+git clone https://gitlab.com/YOUR-ACCOUNT/omarchy-eso-server-status.git \
   ~/.config/omarchy/plugins/eso.server-status
 omarchy-shell shell rescanPlugins
 omarchy plugin enable eso.server-status
