@@ -27,14 +27,68 @@ the website's own page uses. No API key is required.
 
 ## Install
 
+### Recommended: managed install, updates with `omarchy plugin update`
+
 ```bash
-git clone <this-repo> ~/.config/omarchy/plugins/eso.server-status
+omarchy plugin add https://github.com/YOUR-ACCOUNT/omarchy-eso-server-status.git --enable
+```
+
+`omarchy plugin add` clones the repo into `~/.config/omarchy/plugins/eso.server-status/`,
+validates the manifest, and enables the widget. It will ask which bar section to
+use, defaulting to the right-hand section. The command will warn you first that
+shell plugins run as unsandboxed code inside the long-lived `omarchy-shell`
+process — this is expected, and it is a fair moment to read the source.
+
+Verify with `omarchy plugin list | grep eso`.
+
+From then on, updates are a first-class operation:
+
+```bash
+omarchy plugin update                       # all git-managed plugins
+omarchy plugin update eso.server-status     # just this one
+```
+
+`omarchy plugin update` discovers managed plugins by looking for a `.git`
+directory in each plugin folder, fetches `origin`, shows you the diff, asks for
+confirmation, and fast-forwards. It re-validates the manifest afterwards and
+rolls back if the update does not validate, so a bad release cannot leave you
+with a broken shell.
+
+Two things worth knowing:
+
+- Updates are **fast-forward only**. If you edit files inside your installed
+  copy and commit them, the update will refuse rather than clobber your work
+  (it will tell you to reset or reinstall). For local changes, use the
+  development install below instead.
+- After an update, run `omarchy restart shell`. The plugin's service is
+  declared `keepLoaded`, so bar-widget changes hot-reload on their own but
+  service changes need a restart to take effect.
+
+Uninstalling:
+
+```bash
+omarchy plugin remove eso.server-status
+```
+
+### Development install
+
+For working on the plugin, or if you prefer to manage it yourself:
+
+```bash
+git clone https://github.com/YOUR-ACCOUNT/omarchy-eso-server-status.git \
+  ~/.config/omarchy/plugins/eso.server-status
 omarchy-shell shell rescanPlugins
 omarchy plugin enable eso.server-status
 ```
 
-Verify with `omarchy plugin list | grep eso`. The widget starts in the bar's
-right-hand section and can be moved with `omarchy bar move`.
+This works identically — `omarchy plugin update` will still manage the
+checkout, since it is a git repository — but it fails if you push local
+commits, because updates require a fast-forward.
+
+Do not use both methods on the same machine. `omarchy plugin add` refuses to
+proceed when a plugin id is already present; if you previously hand-installed
+the plugin, remove `~/.config/omarchy/plugins/eso.server-status` before running
+it.
 
 ## Usage
 
