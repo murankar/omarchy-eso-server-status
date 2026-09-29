@@ -28,10 +28,14 @@ Panel {
   readonly property int onlineCount: service ? service.onlineCount : -1
   readonly property int totalCount: service ? service.totalCount : 0
   readonly property bool stale: service ? service.stale : false
+  // The service owns the real switch, so the toggle reflects what actually
+  // gates the polls rather than just what is in the settings object.
+  readonly property bool paused: service ? service.paused : root.boolSetting("paused", false)
 
   // Left click used to open the site, so the poll settings had nowhere to live
   // except a hand-edited shell.json. They get a tab now.
   property int tab: 0
+
   readonly property var tabs: ["Servers", "Settings"]
 
   function intSetting(name, fallback) {
@@ -85,6 +89,17 @@ Panel {
     return root.redColor
   }
 
+  // The panel never claims a freshness it does not have. A failed poll and a
+  // paused poll both mean the counts below are last-known rather than current,
+  // so both are said out loud instead of being shown as a live reading.
+  function subtitle() {
+    if (root.onlineCount < 0) return "Waiting for first update"
+    var counts = root.onlineCount + " of " + root.totalCount + " servers online"
+    if (root.paused) return "Polling paused - " + counts
+    if (root.stale) return "Could not reach esoserverstatus.net"
+    return counts
+  }
+
   function textForState(state) {
     if (root.stale) return "unknown"
     if (state === "online") return "online"
@@ -104,6 +119,7 @@ Panel {
     focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(300))
     contentHeight: panel.fittedContentHeight(body.implicitHeight)
+
 
 
     PanelKeyCatcher {
@@ -135,10 +151,8 @@ Panel {
         }
 
         Text {
-          text: root.stale
-            ? "Could not reach esoserverstatus.net"
-            : (root.onlineCount >= 0 ? root.onlineCount + " of " + root.totalCount + " servers online" : "Waiting for first update")
-          color: root.stale ? root.dimmed : Qt.rgba(bar.barForeground.r, bar.barForeground.g, bar.barForeground.b, 0.65)
+          text: root.subtitle()
+          color: (root.stale || root.paused) ? root.dimmed : Qt.rgba(bar.barForeground.r, bar.barForeground.g, bar.barForeground.b, 0.65)
           font.family: Style.fontFamily
           font.pixelSize: Style.font.caption
         }
@@ -298,6 +312,35 @@ Panel {
         width: parent.width
         spacing: Style.space(4)
         visible: root.tab === 1
+
+        // Pause sits above the intervals on purpose: while it is on, the two
+        // intervals below describe a poll that is not happening. Resuming forces
+        // a refresh in Service.qml, so this is not a mute-then-wait switch.
+        Item {
+          width: parent.width
+          height: Style.spacing.controlHeight
+
+          ToggleSwitch {
+            id: pauseSwitch
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            checked: root.paused
+            foreground: bar.barForeground
+            onToggled: root.setSetting("paused", !root.paused)
+          }
+
+          Text {
+            anchors.left: parent.left
+            anchors.right: pauseSwitch.left
+            anchors.rightMargin: Style.space(12)
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Pause polling"
+            elide: Text.ElideRight
+            color: bar.barForeground
+            font.family: Style.fontFamily
+            font.pixelSize: Style.font.body
+          }
+        }
 
         // Each row is an Item, not a Row: a Row positions its children itself
         // and rejects anchors, which is what puts the control on the trailing

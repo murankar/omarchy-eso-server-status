@@ -134,11 +134,12 @@ the DNS provider row in the network panel, so the two read as the same control:
 
 ### Settings
 
-All four are editable from the panel's **Settings** tab and are stored in your
+All five are editable from the panel's **Settings** tab and are stored in your
 `~/.config/omarchy/shell.json`.
 
 | Tab label | Key | Default | Effect |
 |---|---|---|---|
+| `Pause polling` | `paused` | `false` | Stop polling entirely and hold the last known status |
 | `Healthy poll (s)` | `healthyInterval` | `300` | Seconds between polls while all servers are online |
 | `Incident poll (s)` | `alertInterval` | `60` | Seconds between polls while an incident is open |
 | `Notify on recovery` | `notifyRecovery` | `true` | Send a desktop notification when all servers come back online |
@@ -147,6 +148,13 @@ All four are editable from the panel's **Settings** tab and are stored in your
 A new interval takes effect on the next poll; nothing needs restarting. The
 numeric fields are bounded to the same minimums the service clamps to, so a
 value cannot be entered that the service would silently override.
+
+**Pausing** spends no requests at all, which is the point if you are on a
+metered link or simply do not want the icon to change under you. Resuming
+forces an immediate refresh rather than waiting out the interval that was left
+over, so the panel never presents pre-pause data as current. Because the counts
+really are last-known while paused, the panel header and the bar tooltip both
+say so instead of showing a stale reading as if it were live.
 
 ## Request budget
 

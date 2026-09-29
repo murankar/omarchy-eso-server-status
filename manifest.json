@@ -20,12 +20,18 @@
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
+      "paused": false,
       "healthyInterval": 300,
       "alertInterval": 60,
       "notifyRecovery": true,
       "detail": false
     },
     "schema": [
+      {
+        "key": "paused",
+        "type": "boolean",
+        "label": "Pause polling (resume forces an immediate refresh)"
+      },
       {
         "key": "healthyInterval",
         "type": "number",

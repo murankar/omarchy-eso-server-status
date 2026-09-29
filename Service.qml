@@ -38,6 +38,16 @@ Item {
   // claiming a freshness we no longer have.
   property bool stale: false
 
+  // User-facing poll switch. While paused the last known status is held rather
+  // than refreshed, which is the point: the user asked to spend no requests.
+  // Resuming forces a fetch instead of waiting out the interval that was left
+  // over, so the panel never presents pre-pause data as current.
+  readonly property bool paused: !!setting("paused", false)
+
+  onPausedChanged: {
+    if (!paused) lastPollAt = 0
+  }
+
   // Pushed in by whichever bar widget carries the user's settings.
   property var settings: ({})
 
@@ -68,7 +78,7 @@ Item {
   }
 
   function maybePoll() {
-    if (settled || fetch.running) return
+    if (paused || settled || fetch.running) return
     if (Date.now() / 1000 - lastPollAt < nextIntervalSeconds()) return
     lastPollAt = Date.now() / 1000
     settled = true

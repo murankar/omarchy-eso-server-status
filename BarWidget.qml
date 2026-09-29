@@ -23,6 +23,14 @@ BarWidget {
   readonly property int totalCount: service ? service.totalCount : 0
   readonly property bool stale: service ? service.stale : false
 
+  // Paused outranks the count: "polling paused" is the honest reading even
+  // with detail on, because the count is last-known rather than current.
+  readonly property string statusSuffix: service && service.paused
+    ? "polling paused"
+    : (setting("detail", false) && root.onlineCount >= 0
+      ? root.onlineCount + "/" + root.totalCount + " online"
+      : "")
+
   readonly property var palette: Theme.parsePalette(paletteFile.text())
 
   readonly property color greenColor: Theme.pick(palette,
@@ -133,8 +141,8 @@ BarWidget {
     activeColor: root.statusColor
     useActiveColor: true
     active: true
-    tooltipText: setting("detail", false) && root.onlineCount >= 0
-      ? "ESO Server Status - " + root.onlineCount + "/" + root.totalCount + " online"
+    tooltipText: root.statusSuffix.length > 0
+      ? "ESO Server Status - " + root.statusSuffix
       : "ESO Server Status"
     // Left opens the per-server panel, right still opens the site, middle
     // forces a re-poll. The panel carries its own link so nothing is lost.
