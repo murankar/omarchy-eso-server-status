@@ -1,0 +1,8 @@
+# Editor and OS cruft
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Local scratch
+*.log

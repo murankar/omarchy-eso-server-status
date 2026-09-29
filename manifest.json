@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "eso.server-status",
+  "name": "ESO Server Status",
+  "version": "1.1.0",
+  "author": "uri",
+  "description": "Elder Scrolls Online server status indicator with shared, outage-aware polling",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "ESO Server Status",
+    "description": "Green when all 7 ESO servers are online, red when all are offline, orange otherwise",
+    "category": "Info",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "healthyInterval": 300,
+      "alertInterval": 60,
+      "notifyRecovery": true,
+      "detail": false
+    },
+    "schema": [
+      {
+        "key": "healthyInterval",
+        "type": "number",
+        "label": "Poll interval when all servers are online (seconds)"
+      },
+      {
+        "key": "alertInterval",
+        "type": "number",
+        "label": "Poll interval during an outage (seconds)"
+      },
+      {
+        "key": "notifyRecovery",
+        "type": "boolean",
+        "label": "Notify when all servers come back online"
+      },
+      {
+        "key": "detail",
+        "type": "boolean",
+        "label": "Append online count to tooltip"
+      }
+    ]
+  },
+  "keepLoaded": true
+}
