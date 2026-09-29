@@ -140,28 +140,32 @@ Panel {
             color: root.colorForState(modelData.state)
           }
 
+          // Right-aligned, sitting clear of the border by the content inset
+          // plus this margin. The name is bounded by the status rather than
+          // the row edge, so the two cannot overlap when the label is the
+          // longer of the pair ("ongoing issues").
           Text {
-            id: nameText
-            anchors.left: dot.right
-            anchors.leftMargin: Style.space(10)
-            anchors.verticalCenter: parent.verticalCenter
-            text: modelData.name
-            color: bar.barForeground
-            font.family: Style.fontFamily
-            font.pixelSize: Style.font.body
-          }
-
-          // Sits after the name rather than pinned to the right edge: right
-          // anchoring ran it into the card border, and "ongoing issues" is
-          // wider still, so it could also collide with the name.
-          Text {
-            anchors.left: nameText.right
-            anchors.leftMargin: Style.space(12)
+            id: statusText
+            anchors.right: parent.right
+            anchors.rightMargin: Style.spacing.lg
             anchors.verticalCenter: parent.verticalCenter
             text: root.textForState(modelData.state)
             color: root.colorForState(modelData.state)
             font.family: Style.fontFamily
             font.pixelSize: Style.font.caption
+          }
+
+          Text {
+            anchors.left: dot.right
+            anchors.leftMargin: Style.space(10)
+            anchors.right: statusText.left
+            anchors.rightMargin: Style.space(10)
+            anchors.verticalCenter: parent.verticalCenter
+            text: modelData.name
+            elide: Text.ElideRight
+            color: bar.barForeground
+            font.family: Style.fontFamily
+            font.pixelSize: Style.font.body
           }
         }
       }
