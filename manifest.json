@@ -3,7 +3,7 @@
   "id": "eso.server-status",
   "name": "ESO Server Status",
   "version": "1.1.0",
-  "author": "uri",
+  "author": "Matthias Urankar",
   "description": "Elder Scrolls Online server status indicator with shared, outage-aware polling",
   "kinds": [
     "service",

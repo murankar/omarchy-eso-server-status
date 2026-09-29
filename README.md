@@ -194,3 +194,11 @@ processes while a poll is in flight.
 
 Data from [esoserverstatus.net](https://esoserverstatus.net/), which is not
 affiliated with ZeniMax Online Studios or Bethesda Softworks.
+
+## License
+
+MIT — see [LICENSE](LICENSE). In short: use it however you like, including
+commercially, but keep the copyright notice in any copy or substantial portion
+of the plugin.
+
+Built by Matthias Urankar.
