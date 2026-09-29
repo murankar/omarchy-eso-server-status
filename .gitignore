@@ -6,3 +6,6 @@ Thumbs.db
 
 # Local scratch
 *.log
+
+# Private production notes; deliberately never published
+ProjectNotes-BaseApp.md
