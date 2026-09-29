@@ -140,6 +140,52 @@ offline network cannot turn the widget into a request flood.
 but the glyph drops to the neutral foreground colour, so a dead endpoint cannot
 read as "all clear".
 
+## Privacy and network behaviour
+
+This is a network client, so it is worth being precise about what it sends.
+
+**One endpoint, nothing else.** The only address the plugin ever contacts is:
+
+```
+https://esoserverstatus.net/api/refresh
+```
+
+There is no analytics, no telemetry, no crash reporting, no update check, and
+no home-server-style beacon. The widget never contacts a developer, a package
+registry, or any third party other than the site it displays.
+
+**No data is collected, stored, or transmitted.** The plugin reads a public
+status document and renders a colour. It writes no files, keeps no database,
+sends no identifiers, and has no configuration that could be used to report
+anything back. Nothing it learns is transmitted onward.
+
+**What the site can see.** Like any HTTP client, the request necessarily reveals
+your IP address and the `curl` user agent to the site, plus the two headers the
+endpoint requires. The plugin sets no cookies and stores none — `curl` is
+invoked without a cookie jar, so any session cookie in the response is ignored
+and not persisted. There is no way to use this widget without the site seeing
+that your machine contacted it, which is the same exposure as visiting the
+status page yourself.
+
+**When it contacts the site.** Only while the plugin is installed and enabled,
+at the cadence in the table above — 300s while healthy, 60s during an incident,
+and backing off to 600s on transport failure. Uninstalling the plugin ends all
+outbound traffic:
+
+```bash
+omarchy plugin remove murankar.eso-server-status
+```
+
+**Left click** is a separate, user-initiated request: it opens
+<https://esoserverstatus.net/> in your browser exactly as clicking the link in
+this README would.
+
+**HTTPS only, and no redirects.** The URL is a hardcoded `https://` constant and
+`curl` is invoked without `-L`, so the request cannot be redirected to a
+plaintext or third-party host. Certificate verification stays enabled — `-k` is
+never used — and no credentials are ever sent, since the invocation includes
+neither `--user` nor `--netrc`.
+
 ## Theming
 
 Colours come from your active Omarchy theme and update live on a theme switch.
