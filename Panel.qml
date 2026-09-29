@@ -81,7 +81,11 @@ Panel {
 
     Column {
       id: body
-      width: panel.contentWidth
+      // Track the card's inset content area rather than the raw card width.
+      // contentHolder is already inset by the popup padding and the border, so
+      // using panel.contentWidth here overflows to the right and lets the
+      // border cut through the text.
+      width: parent.width
       spacing: Style.space(10)
 
       // Header
@@ -137,6 +141,7 @@ Panel {
           }
 
           Text {
+            id: nameText
             anchors.left: dot.right
             anchors.leftMargin: Style.space(10)
             anchors.verticalCenter: parent.verticalCenter
@@ -146,9 +151,12 @@ Panel {
             font.pixelSize: Style.font.body
           }
 
+          // Sits after the name rather than pinned to the right edge: right
+          // anchoring ran it into the card border, and "ongoing issues" is
+          // wider still, so it could also collide with the name.
           Text {
-            anchors.right: parent.right
-            anchors.rightMargin: Style.space(2)
+            anchors.left: nameText.right
+            anchors.leftMargin: Style.space(12)
             anchors.verticalCenter: parent.verticalCenter
             text: root.textForState(modelData.state)
             color: root.colorForState(modelData.state)
