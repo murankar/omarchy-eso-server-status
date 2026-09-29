@@ -48,15 +48,78 @@ BarWidget {
     if (root.service) root.service.settings = root.settings
   }
 
+  // One handler per signal, so the service-arrival path is centralised here:
+  // settings get pushed into the service, and the panel is re-injected so it
+  // picks up the same object.
+  function onServiceArrived() {
+    pushSettings()
+    injectPanel()
+  }
+
   onSettingsChanged: pushSettings()
-  onServiceChanged: pushSettings()
-  Component.onCompleted: pushSettings()
+  onServiceChanged: onServiceArrived()
+  Component.onCompleted: onServiceArrived()
+
+  // The panel is a view onto the service, so hand it the live object rather
+  // than letting it reach for one. That keeps the service the single owner of
+  // state and of the network.
+  function injectPanel() {
+    var target = panelLoader.item
+    if (!target) return
+    if ("bar" in target) target.bar = root.bar
+    if ("settings" in target) target.settings = root.settings
+    if ("service" in target) target.service = root.service
+    if ("anchorItem" in target) target.anchorItem = button
+    if ("hostWidget" in target) target.hostWidget = root
+  }
+
+  function togglePanel() {
+    if (panelLoader.item && panelLoader.item.toggle) panelLoader.item.toggle()
+  }
+
+  // Shape contract for shell.summon/hide/toggle routing: the bar identifies a
+  // panel by the bar-widget root, so it needs open/close/opened here.
+  readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false
+
+  function open() {
+    if (panelLoader.item && panelLoader.item.open) panelLoader.item.open()
+  }
+
+  function close() {
+    if (panelLoader.item && panelLoader.item.close) panelLoader.item.close()
+  }
+
+  readonly property bool popoutSwitchClosing: panelLoader.item
+    ? panelLoader.item.popoutSwitchClosing === true : false
+
+  function closeForPopoutSwitch() {
+    if (panelLoader.item && panelLoader.item.closeForPopoutSwitch) panelLoader.item.closeForPopoutSwitch()
+  }
+
+  onBarChanged: injectPanel()
 
   FileView {
     id: paletteFile
     path: Color.home + "/.local/state/omarchy/current/theme/colors.toml"
     watchChanges: true
     printErrors: false
+  }
+
+  Loader {
+    id: panelLoader
+    active: true
+    source: Qt.resolvedUrl("Panel.qml")
+    visible: false
+    onLoaded: {
+      root.injectPanel()
+      Qt.callLater(root.injectPanel)
+    }
+    onStatusChanged: {
+      if (status === Loader.Ready) {
+        root.injectPanel()
+        Qt.callLater(root.injectPanel)
+      }
+    }
   }
 
   BarIconButton {
@@ -71,9 +134,16 @@ BarWidget {
     tooltipText: setting("detail", false) && root.onlineCount >= 0
       ? "ESO Server Status - " + root.onlineCount + "/" + root.totalCount + " online"
       : "ESO Server Status"
+    // Left opens the per-server panel, right still opens the site, middle
+    // forces a re-poll. The panel carries its own link so nothing is lost.
     onPressed: function(b) {
-      if (b === Qt.MiddleButton && root.service) root.service.lastPollAt = 0
-      else Quickshell.execDetached(["omarchy-launch-browser", "https://esoserverstatus.net/"])
+      if (b === Qt.MiddleButton) {
+        if (root.service) root.service.lastPollAt = 0
+      } else if (b === Qt.RightButton) {
+        Quickshell.execDetached(["omarchy-launch-browser", "https://esoserverstatus.net/"])
+      } else {
+        root.togglePanel()
+      }
     }
   }
 }

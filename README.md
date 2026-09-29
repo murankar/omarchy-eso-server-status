@@ -95,11 +95,32 @@ it.
 | Action | Result |
 |---|---|
 | **Hover** | Tooltip reads `ESO Server Status` (or `ESO Server Status - 6/7 online` when the `detail` setting is on) |
-| **Left click** | Opens <https://esoserverstatus.net/> in your browser |
+| **Left click** | Toggles the per-server panel |
+| **Right click** | Opens <https://esoserverstatus.net/> in your browser |
 | **Middle click** | Forces an immediate re-poll instead of waiting out the current interval |
 
 The widget is hidden entirely until the first successful response arrives, so it
 never appears in the bar as a meaningless empty slot during startup.
+
+### The server panel
+
+Left click opens a popout under the bar entry listing all seven servers, each
+coloured by its own reported state rather than by the fleet as a whole:
+
+| State | Colour | Meaning |
+|---|---|---|
+| `online` | green | The service reported `true` |
+| `ongoing issues` | amber | The service reported `2`: reachable, but impaired |
+| `offline` | red | The service reported `false` |
+| `unknown` | dimmed | The last poll failed, so no state is being claimed |
+
+Amber is deliberately distinct from red: a server reporting ongoing issues is
+still up, and collapsing the two would overstate the severity.
+
+The panel opens under the bar entry, closes on outside click, on `Escape`, and
+via the shell's normal panel dismissal, and carries its own link to the site so
+right click is never the only route there. It is a pure view: it never performs
+a request of its own, so opening it does not change the request budget below.
 
 ## Settings
 
@@ -176,9 +197,10 @@ outbound traffic:
 omarchy plugin remove murankar.eso-server-status
 ```
 
-**Left click** is a separate, user-initiated request: it opens
-<https://esoserverstatus.net/> in your browser exactly as clicking the link in
-this README would.
+**Right click**, or the link at the foot of the panel, is a separate,
+user-initiated request: it opens <https://esoserverstatus.net/> in your browser
+exactly as clicking the link in this README would. Opening the panel itself is
+not a network request.
 
 **HTTPS only, and no redirects.** The URL is a hardcoded `https://` constant and
 `curl` is invoked without `-L`, so the request cannot be redirected to a
@@ -203,6 +225,7 @@ green, orange, and red.
 ```
 Service.qml    one per shell process; owns the Process, the Timer, and all state
 BarWidget.qml  per bar surface; reads published state, renders, handles input
+Panel.qml      per bar surface; the popout list, a view onto the same service
 Theme.js       hue-aware colour selection from the active theme's palette
 manifest.json  plugin metadata and the settings schema
 ```
@@ -210,6 +233,11 @@ manifest.json  plugin metadata and the settings schema
 The split matters: the widget can be instantiated many times (one per monitor)
 while the service cannot, which is what keeps the request count independent of
 monitor count.
+
+`Panel.qml` is nested inside the bar widget rather than declared as its own
+entry point. It is handed the live service object, so it is a view and never a
+second source of truth: opening the panel adds no polling, and it cannot drift
+from what the bar glyph reports.
 
 `service` is declared `keepLoaded: true` so that editing and hot-reloading the
 bar widget cannot orphan the live service object. The trade-off is that changes

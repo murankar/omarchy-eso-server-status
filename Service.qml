@@ -28,6 +28,11 @@ Item {
   property int onlineCount: -1
   property int totalCount: 0
 
+  // Per-server detail for the bar panel. Reassigned wholesale rather than
+  // mutated, because a QML property holding an array only notifies bindings
+  // when the reference itself changes.
+  property var serverList: []
+
   // True when the last fetch failed. The last known status is kept so the bar
   // can still render something, but the widget shows it neutrally rather than
   // claiming a freshness we no longer have.
@@ -105,12 +110,19 @@ Item {
     if (names.length === 0) return false
 
     var online = 0
+    var list = []
     for (var i = 0; i < names.length; i++) {
-      if (servers[names[i]] === true) online++
+      var value = servers[names[i]]
+      if (value === true) online++
+      list.push({
+        name: names[i],
+        state: value === true ? "online" : (value === 2 ? "issues" : "offline")
+      })
     }
 
     totalCount = names.length
     onlineCount = online
+    serverList = list
     status = online === names.length ? "green" : (online === 0 ? "red" : "orange")
     return true
   }
