@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "id": "eso.server-status",
+  "id": "murankar.eso-server-status",
   "name": "ESO Server Status",
   "version": "1.1.0",
   "author": "Matthias Urankar",

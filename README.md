@@ -33,7 +33,7 @@ the website's own page uses. No API key is required.
 omarchy plugin add https://github.com/murankar/omarchy-eso-server-status.git --enable
 ```
 
-`omarchy plugin add` clones the repo into `~/.config/omarchy/plugins/eso.server-status/`,
+`omarchy plugin add` clones the repo into `~/.config/omarchy/plugins/murankar.eso-server-status/`,
 validates the manifest, and enables the widget. It will ask which bar section to
 use, defaulting to the right-hand section. The command will warn you first that
 shell plugins run as unsandboxed code inside the long-lived `omarchy-shell`
@@ -44,8 +44,8 @@ Verify with `omarchy plugin list | grep eso`.
 From then on, updates are a first-class operation:
 
 ```bash
-omarchy plugin update                       # all git-managed plugins
-omarchy plugin update eso.server-status     # just this one
+omarchy plugin update                           # all git-managed plugins
+omarchy plugin update murankar.eso-server-status # just this one
 ```
 
 `omarchy plugin update` discovers managed plugins by looking for a `.git`
@@ -67,7 +67,7 @@ Two things worth knowing:
 Uninstalling:
 
 ```bash
-omarchy plugin remove eso.server-status
+omarchy plugin remove murankar.eso-server-status
 ```
 
 ### Development install
@@ -76,9 +76,9 @@ For working on the plugin, or if you prefer to manage it yourself:
 
 ```bash
 git clone https://github.com/murankar/omarchy-eso-server-status.git \
-  ~/.config/omarchy/plugins/eso.server-status
+  ~/.config/omarchy/plugins/murankar.eso-server-status
 omarchy-shell shell rescanPlugins
-omarchy plugin enable eso.server-status
+omarchy plugin enable murankar.eso-server-status
 ```
 
 This works identically — `omarchy plugin update` will still manage the
@@ -87,7 +87,7 @@ commits, because updates require a fast-forward.
 
 Do not use both methods on the same machine. `omarchy plugin add` refuses to
 proceed when a plugin id is already present; if you previously hand-installed
-the plugin, remove `~/.config/omarchy/plugins/eso.server-status` before running
+the plugin, remove `~/.config/omarchy/plugins/murankar.eso-server-status` before running
 it.
 
 ## Usage
@@ -173,7 +173,7 @@ automatic reload.
 ## Development
 
 ```bash
-omarchy plugin validate ~/.config/omarchy/plugins/eso.server-status
+omarchy plugin validate ~/.config/omarchy/plugins/murankar.eso-server-status
 omarchy restart shell        # required after editing Service.qml
 ```
 
@@ -183,7 +183,7 @@ Bar-widget edits hot-reload on save. Watch the log with:
 journalctl --user -f | grep eso
 ```
 
-A widget failing to load is logged as `Plugin widget eso.server-status failed`
+A widget failing to load is logged as `Plugin widget murankar.eso-server-status failed`
 with the QML error; a widget that loads but silently shows nothing is usually a
 missing `implicitWidth`/`implicitHeight` on the root item.
 
