@@ -36,6 +36,7 @@ Panel {
   // except a hand-edited shell.json. They get a tab now.
   property int tab: 0
 
+
   readonly property var tabs: ["Servers", "Settings"]
 
   function intSetting(name, fallback) {
@@ -82,7 +83,13 @@ Panel {
     ["red", "bright_red", "color1", "color9", "color88"], "red", "#dc3545")
 
   // A server with reported problems reads amber, not red: it is still up.
+  //
+  // Paused is checked before stale and deliberately takes the server name's
+  // own colour. A coloured dot beside the word "paused" would be a state claim
+  // the panel has withdrawn, so the whole row goes neutral: dot, status and
+  // name all in barForeground. Nothing on screen can then be misread as live.
   function colorForState(state) {
+    if (root.paused) return bar.barForeground
     if (root.stale) return root.dimmed
     if (state === "online") return root.greenColor
     if (state === "issues") return root.orangeColor
@@ -101,6 +108,7 @@ Panel {
   }
 
   function textForState(state) {
+    if (root.paused) return "paused"
     if (root.stale) return "unknown"
     if (state === "online") return "online"
     if (state === "issues") return "ongoing issues"

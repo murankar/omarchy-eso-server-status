@@ -152,9 +152,24 @@ value cannot be entered that the service would silently override.
 **Pausing** spends no requests at all, which is the point if you are on a
 metered link or simply do not want the icon to change under you. Resuming
 forces an immediate refresh rather than waiting out the interval that was left
-over, so the panel never presents pre-pause data as current. Because the counts
-really are last-known while paused, the panel header and the bar tooltip both
-say so instead of showing a stale reading as if it were live.
+over, so the panel never presents pre-pause data as current.
+
+Because the counts really are last-known while paused, the plugin stops
+claiming a live status everywhere at once. Four surfaces change together, so
+the state is unambiguous wherever you happen to be looking:
+
+| Surface | While paused | While live |
+|---|---|---|
+| Bar glyph | Plain foreground, same as the other bar glyphs | Green / amber / red by fleet status |
+| Bar tooltip | `polling paused` | Status count, with `detail` on |
+| Panel header | `Polling paused - N of 7 servers online` | `N of 7 servers online` |
+| Every server row | `paused`, dot in the server name's own colour | That server's state and colour |
+
+The per-row change is the important one: a green or red dot next to the word
+`paused` would be a state claim the plugin has withdrawn, so while paused each
+row's dot and status take the same neutral colour as the server name. Nothing
+on screen can be misread as a live reading. Turning polling back on restores
+the glyph and every row to the appropriate colour on the next refresh.
 
 ## Request budget
 

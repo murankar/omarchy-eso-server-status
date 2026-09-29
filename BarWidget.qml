@@ -22,10 +22,11 @@ BarWidget {
   readonly property int onlineCount: service ? service.onlineCount : -1
   readonly property int totalCount: service ? service.totalCount : 0
   readonly property bool stale: service ? service.stale : false
+  readonly property bool paused: service ? service.paused : false
 
   // Paused outranks the count: "polling paused" is the honest reading even
   // with detail on, because the count is last-known rather than current.
-  readonly property string statusSuffix: service && service.paused
+  readonly property string statusSuffix: root.paused
     ? "polling paused"
     : (setting("detail", false) && root.onlineCount >= 0
       ? root.onlineCount + "/" + root.totalCount + " online"
@@ -40,9 +41,13 @@ BarWidget {
   readonly property color redColor: Theme.pick(palette,
     ["red", "bright_red", "color1", "color9", "color88"], "red", "#dc3545")
 
-  // A stale reading falls back to the plain foreground rather than holding the
-  // last known red/green, so a dead endpoint never reads as "all clear".
-  readonly property color statusColor: stale ? (bar ? bar.barForeground : Color.foreground)
+  // Both a stale and a paused reading fall back to the plain foreground: a
+  // dead endpoint and a user-requested pause must not keep holding the last
+  // known red/green, or the glyph would claim a live status it does not have.
+  // Paused and stale look the same on purpose -- the glyph should stop being a
+  // status light rather than grow a new state, and the tooltip and the panel
+  // header say which of the two it is.
+  readonly property color statusColor: (stale || paused) ? (bar ? bar.barForeground : Color.foreground)
     : status === "green" ? greenColor
     : status === "red" ? redColor
     : status === "orange" ? orangeColor
