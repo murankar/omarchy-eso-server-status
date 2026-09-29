@@ -122,17 +122,31 @@ via the shell's normal panel dismissal, and carries its own link to the site so
 right click is never the only route there. It is a pure view: it never performs
 a request of its own, so opening it does not change the request budget below.
 
-## Settings
+### Tabs
 
-All four are editable from the shell settings panel and are stored in your
+The panel has two tabs, set between a pair of dividers and drawn the same way as
+the DNS provider row in the network panel, so the two read as the same control:
+
+| Tab | Contents |
+|---|---|
+| **Servers** | The seven-server list, plus the site link |
+| **Settings** | The four polling settings below |
+
+### Settings
+
+All four are editable from the panel's **Settings** tab and are stored in your
 `~/.config/omarchy/shell.json`.
 
-| Key | Default | Effect |
-|---|---|---|
-| `healthyInterval` | `300` | Seconds between polls while all servers are online |
-| `alertInterval` | `60` | Seconds between polls while an incident is open |
-| `notifyRecovery` | `true` | Send a desktop notification when all servers come back online |
-| `detail` | `false` | Append ` - N/7 online` to the tooltip |
+| Tab label | Key | Default | Effect |
+|---|---|---|---|
+| `Healthy poll (s)` | `healthyInterval` | `300` | Seconds between polls while all servers are online |
+| `Incident poll (s)` | `alertInterval` | `60` | Seconds between polls while an incident is open |
+| `Notify on recovery` | `notifyRecovery` | `true` | Send a desktop notification when all servers come back online |
+| `Count in tooltip` | `detail` | `false` | Append ` - N/7 online` to the tooltip |
+
+A new interval takes effect on the next poll; nothing needs restarting. The
+numeric fields are bounded to the same minimums the service clamps to, so a
+value cannot be entered that the service would silently override.
 
 ## Request budget
 

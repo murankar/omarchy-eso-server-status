@@ -71,6 +71,8 @@ BarWidget {
     if ("service" in target) target.service = root.service
     if ("anchorItem" in target) target.anchorItem = button
     if ("hostWidget" in target) target.hostWidget = root
+    // The panel writes settings back under this id.
+    if ("moduleName" in target) target.moduleName = root.moduleName
   }
 
   function togglePanel() {

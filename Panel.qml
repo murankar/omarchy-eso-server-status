@@ -29,6 +29,38 @@ Panel {
   readonly property int totalCount: service ? service.totalCount : 0
   readonly property bool stale: service ? service.stale : false
 
+  // Left click used to open the site, so the poll settings had nowhere to live
+  // except a hand-edited shell.json. They get a tab now.
+  property int tab: 0
+  readonly property var tabs: ["Servers", "Settings"]
+
+  function intSetting(name, fallback) {
+    var raw = root.settings ? root.settings[name] : undefined
+    if (raw === undefined || raw === null) return fallback
+    var n = Number(raw)
+    return isFinite(n) ? Math.round(n) : fallback
+  }
+
+  function boolSetting(name, fallback) {
+    var raw = root.settings ? root.settings[name] : undefined
+    return (raw === undefined || raw === null) ? fallback : !!raw
+  }
+
+  // Push into the service as well as persisting, so a new interval takes effect
+  // on the next poll instead of waiting for the shell.json write to come back
+  // through the bar. The service re-reads its intervals on every poll, so no
+  // restart is needed.
+  function setSetting(key, value) {
+    var entry = { id: root.moduleName }
+    for (var k in root.settings) if (k !== "id") entry[k] = root.settings[k]
+    entry[key] = value
+    root.settings = entry
+    if (root.service) root.service.settings = entry
+    if (root.bar && root.bar.shell && typeof root.bar.shell.updateEntryInline === "function")
+      root.bar.shell.updateEntryInline(root.moduleName, entry)
+  }
+
+
   FileView {
     id: paletteFile
     path: Color.home + "/.local/state/omarchy/current/theme/colors.toml"
@@ -73,6 +105,7 @@ Panel {
     contentWidth: panel.fittedContentWidth(Style.space(300))
     contentHeight: panel.fittedContentHeight(body.implicitHeight)
 
+
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
@@ -116,57 +149,41 @@ Panel {
         foreground: bar.barForeground
       }
 
-      // One row per server, coloured by its own state rather than the fleet's.
-      Repeater {
-        model: root.servers
+      // Tab pills, built the same way as the network panel's DNS provider row
+      // so the two panels read as the same kind of control: equal-width cells,
+      // outlined, with the current one filled.
+      Row {
+        id: tabRow
+        width: parent.width
+        spacing: Style.space(6)
 
-        delegate: Rectangle {
-          required property var modelData
-          required property int index
+        readonly property int count: root.tabs.length
+        readonly property real cellWidth: (width - spacing * (count - 1)) / count
 
-          width: body.width
-          height: Style.space(26)
-          radius: Style.cornerRadius
-          color: "transparent"
+        Button {
+          text: root.tabs[0]
+          width: tabRow.cellWidth
+          active: root.tab === 0
+          bordered: true
+          foreground: bar.barForeground
+          fontFamily: Style.fontFamily
+          fontSize: Style.font.bodySmall
+          horizontalPadding: Style.spacing.controlPaddingX
+          verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
+          onClicked: root.tab = 0
+        }
 
-          Rectangle {
-            id: dot
-            width: Style.space(8)
-            height: Style.space(8)
-            radius: width / 2
-            anchors.left: parent.left
-            anchors.leftMargin: Style.space(2)
-            anchors.verticalCenter: parent.verticalCenter
-            color: root.colorForState(modelData.state)
-          }
-
-          // Right-aligned, sitting clear of the border by the content inset
-          // plus this margin. The name is bounded by the status rather than
-          // the row edge, so the two cannot overlap when the label is the
-          // longer of the pair ("ongoing issues").
-          Text {
-            id: statusText
-            anchors.right: parent.right
-            anchors.rightMargin: Style.spacing.lg
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.textForState(modelData.state)
-            color: root.colorForState(modelData.state)
-            font.family: Style.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-
-          Text {
-            anchors.left: dot.right
-            anchors.leftMargin: Style.space(10)
-            anchors.right: statusText.left
-            anchors.rightMargin: Style.space(10)
-            anchors.verticalCenter: parent.verticalCenter
-            text: modelData.name
-            elide: Text.ElideRight
-            color: bar.barForeground
-            font.family: Style.fontFamily
-            font.pixelSize: Style.font.body
-          }
+        Button {
+          text: root.tabs[1]
+          width: tabRow.cellWidth
+          active: root.tab === 1
+          bordered: true
+          foreground: bar.barForeground
+          fontFamily: Style.fontFamily
+          fontSize: Style.font.bodySmall
+          horizontalPadding: Style.spacing.controlPaddingX
+          verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
+          onClicked: root.tab = 1
         }
       }
 
@@ -175,36 +192,233 @@ Panel {
         foreground: bar.barForeground
       }
 
-      // Reachable without leaving the panel, since left click no longer opens
-      // the site directly.
-      Rectangle {
-        id: siteLink
+      Column {
+        id: serversTab
         width: parent.width
-        height: Style.space(24)
-        radius: Style.cornerRadius
-        color: siteHover.hovered
-          ? Style.hoverFillFor(bar.barForeground, Color.accent)
-          : "transparent"
+        spacing: Style.space(10)
+        visible: root.tab === 0
 
-        HoverHandler {
-          id: siteHover
+        // One row per server, coloured by its own state rather than the fleet's.
+        Repeater {
+          model: root.servers
+
+          delegate: Rectangle {
+            required property var modelData
+            required property int index
+
+            width: serversTab.width
+            height: Style.space(26)
+            radius: Style.cornerRadius
+            color: "transparent"
+
+            Rectangle {
+              id: dot
+              width: Style.space(8)
+              height: Style.space(8)
+              radius: width / 2
+              anchors.left: parent.left
+              anchors.leftMargin: Style.space(2)
+              anchors.verticalCenter: parent.verticalCenter
+              color: root.colorForState(modelData.state)
+            }
+
+            // Right-aligned, sitting clear of the border by the content inset
+            // plus this margin. The name is bounded by the status rather than
+            // the row edge, so the two cannot overlap when the label is the
+            // longer of the pair ("ongoing issues").
+            Text {
+              id: statusText
+              anchors.right: parent.right
+              anchors.rightMargin: Style.spacing.lg
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.textForState(modelData.state)
+              color: root.colorForState(modelData.state)
+              font.family: Style.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            Text {
+              anchors.left: dot.right
+              anchors.leftMargin: Style.space(10)
+              anchors.right: statusText.left
+              anchors.rightMargin: Style.space(10)
+              anchors.verticalCenter: parent.verticalCenter
+              text: modelData.name
+              elide: Text.ElideRight
+              color: bar.barForeground
+              font.family: Style.fontFamily
+              font.pixelSize: Style.font.body
+            }
+          }
         }
 
-        Text {
-          anchors.left: parent.left
-          anchors.leftMargin: Style.space(2)
-          anchors.verticalCenter: parent.verticalCenter
-          text: "Open esoserverstatus.net"
-          color: bar.barForeground
-          font.family: Style.fontFamily
-          font.pixelSize: Style.font.caption
-          font.underline: siteHover.hovered
+        PanelSeparator {
+          width: parent.width
+          foreground: bar.barForeground
         }
 
-        TapHandler {
-          onTapped: {
-            Quickshell.execDetached(["omarchy-launch-browser", "https://esoserverstatus.net/"])
-            root.close()
+        // Reachable without leaving the panel, since left click no longer opens
+        // the site directly.
+        Rectangle {
+          id: siteLink
+          width: parent.width
+          height: Style.space(24)
+          radius: Style.cornerRadius
+          color: siteHover.hovered
+            ? Style.hoverFillFor(bar.barForeground, Color.accent)
+            : "transparent"
+
+          HoverHandler {
+            id: siteHover
+          }
+
+          Text {
+            anchors.left: parent.left
+            anchors.leftMargin: Style.space(2)
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Open esoserverstatus.net"
+            color: bar.barForeground
+            font.family: Style.fontFamily
+            font.pixelSize: Style.font.caption
+            font.underline: siteHover.hovered
+          }
+
+          TapHandler {
+            onTapped: {
+              Quickshell.execDetached(["omarchy-launch-browser", "https://esoserverstatus.net/"])
+              root.close()
+            }
+          }
+        }
+      }
+
+      // ---- Settings tab ----
+      Column {
+        id: settingsTab
+        width: parent.width
+        spacing: Style.space(4)
+        visible: root.tab === 1
+
+        // Each row is an Item, not a Row: a Row positions its children itself
+        // and rejects anchors, which is what puts the control on the trailing
+        // edge. Labels are bounded by the control and elide, so a longer
+        // label or a larger theme font can never overlap the control.
+        //
+        // Numeric ranges mirror the clamps in Service.qml, so a value cannot be
+        // set that the service would silently override.
+        Item {
+          width: parent.width
+          height: Style.spacing.controlHeight
+
+          NumberField {
+            id: healthyField
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            label: ""
+            from: 120
+            to: 3600
+            stepSize: 30
+            value: root.intSetting("healthyInterval", 300)
+            foreground: bar.barForeground
+            fontFamily: Style.fontFamily
+            fontSize: Style.font.bodySmall
+            onModified: function(v) { root.setSetting("healthyInterval", v) }
+          }
+
+          Text {
+            anchors.left: parent.left
+            anchors.right: healthyField.left
+            anchors.rightMargin: Style.space(12)
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Healthy poll (s)"
+            elide: Text.ElideRight
+            color: bar.barForeground
+            font.family: Style.fontFamily
+            font.pixelSize: Style.font.body
+          }
+        }
+
+        Item {
+          width: parent.width
+          height: Style.spacing.controlHeight
+
+          NumberField {
+            id: alertField
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            label: ""
+            from: 30
+            to: 1800
+            stepSize: 30
+            value: root.intSetting("alertInterval", 60)
+            foreground: bar.barForeground
+            fontFamily: Style.fontFamily
+            fontSize: Style.font.bodySmall
+            onModified: function(v) { root.setSetting("alertInterval", v) }
+          }
+
+          Text {
+            anchors.left: parent.left
+            anchors.right: alertField.left
+            anchors.rightMargin: Style.space(12)
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Incident poll (s)"
+            elide: Text.ElideRight
+            color: bar.barForeground
+            font.family: Style.fontFamily
+            font.pixelSize: Style.font.body
+          }
+        }
+
+        Item {
+          width: parent.width
+          height: Style.spacing.controlHeight
+
+          ToggleSwitch {
+            id: recoverySwitch
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            checked: root.boolSetting("notifyRecovery", true)
+            foreground: bar.barForeground
+            onToggled: root.setSetting("notifyRecovery", !root.boolSetting("notifyRecovery", true))
+          }
+
+          Text {
+            anchors.left: parent.left
+            anchors.right: recoverySwitch.left
+            anchors.rightMargin: Style.space(12)
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Notify on recovery"
+            elide: Text.ElideRight
+            color: bar.barForeground
+            font.family: Style.fontFamily
+            font.pixelSize: Style.font.body
+          }
+        }
+
+        Item {
+          width: parent.width
+          height: Style.spacing.controlHeight
+
+          ToggleSwitch {
+            id: detailSwitch
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            checked: root.boolSetting("detail", false)
+            foreground: bar.barForeground
+            onToggled: root.setSetting("detail", !root.boolSetting("detail", false))
+          }
+
+          Text {
+            anchors.left: parent.left
+            anchors.right: detailSwitch.left
+            anchors.rightMargin: Style.space(12)
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Count in tooltip"
+            elide: Text.ElideRight
+            color: bar.barForeground
+            font.family: Style.fontFamily
+            font.pixelSize: Style.font.body
           }
         }
       }
