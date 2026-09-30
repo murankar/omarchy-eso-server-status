@@ -11,6 +11,21 @@ according to the health of the Elder Scrolls Online server fleet.
 | Red | all 7 servers offline | total outage |
 | (neutral) | last reading is stale | the endpoint could not be reached |
 
+## Screenshots
+
+![The per-server panel, opened by left-clicking the bar entry](preview.png)
+
+The panel has two tabs. **Servers** (above) lists each server with its own
+status colour. **Settings** holds the poll intervals, the recovery
+notification, and the pause switch:
+
+![The Settings tab](docs/preview-settings.png)
+
+Full-screen captures of the panel open on the live bar, for context:
+
+- [Servers tab, full screen](docs/panel-servers-fullscreen.png)
+- [Settings tab, full screen](docs/panel-settings-fullscreen.png)
+
 ## Requirements
 
 - Omarchy with the Quickshell-based `omarchy-shell` bar (developed and verified
