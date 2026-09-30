@@ -15,6 +15,10 @@ import Quickshell.Io
 // user genuinely wants freshness, because they are waiting on recovery.
 // Transport failures back off exponentially so an offline network cannot turn
 // this into a request flood either.
+//
+// Muting a server changes what a poll is judged on, never how many polls
+// happen: the endpoint returns the whole fleet in one document, so there is no
+// cheaper request to make and no reason to pretend otherwise.
 Item {
   id: root
 
@@ -23,14 +27,22 @@ Item {
 
   readonly property string apiUrl: "https://esoserverstatus.net/api/refresh"
 
-  // "" until the first successful response; then "green" | "red" | "orange".
+  // "" until the first successful response, then "green" | "red" | "orange".
+  // Also "" once a response has been read but every server is muted: there is
+  // a real reading and nothing to report, which `hasReading` distinguishes.
   property string status: ""
   property int onlineCount: -1
+  // Counted over the monitored servers only, so it is the denominator the
+  // user actually asked about rather than the size of the whole fleet.
   property int totalCount: 0
 
-  // Per-server detail for the bar panel. Reassigned wholesale rather than
-  // mutated, because a QML property holding an array only notifies bindings
-  // when the reference itself changes.
+  // Per-server detail for the bar panel, one entry per server the site
+  // reports. Reassigned wholesale rather than mutated, because a QML property
+  // holding an array only notifies bindings when the reference itself changes.
+  //
+  // Carries no mute flag: the settings object is the only source of truth for
+  // that, and a copy made here would be a poll behind the switch the user just
+  // clicked.
   property var serverList: []
 
   // True when the last fetch failed. The last known status is kept so the bar
@@ -56,9 +68,38 @@ Item {
   property bool everReported: false
   property double lastPollAt: 0
 
+  // True once a response has parsed, whatever it said. Distinct from a
+  // non-empty `status`, which is also false when every server is muted: the
+  // bar stays on screen and says "no servers monitored" rather than
+  // disappearing and taking the panel's own switch row with it.
+  property bool hasReading: false
+
   function setting(name, fallback) {
     var value = settings ? settings[name] : undefined
     return (value === undefined || value === null) ? fallback : value
+  }
+
+  // The servers the user has switched off, as a deny-list of names.
+  //
+  // A deny-list rather than an allow-list for two reasons: an install that
+  // predates the setting has no entry at all and keeps watching the whole
+  // fleet, and a server the site adds later arrives monitored rather than
+  // silently unmonitored by a list that never mentioned it.
+  //
+  // Duck-typed on purpose, never Array.isArray(). The array is built in the
+  // shell's JS realm, and a cross-realm array answers isArray() === false
+  // while still being a perfectly good array with a length and indexOf --
+  // which would silently mute nothing at all, with no error anywhere. Copying
+  // the names out also normalises them to strings, which is what comparing
+  // them against the payload's keys needs. Read as a function rather than a
+  // binding because the panel replaces the whole settings object on every
+  // write, and only a poll and the panel's own rows care about the answer.
+  function mutedList() {
+    var raw = settings ? settings.mutedServers : undefined
+    if (!raw || typeof raw.length !== "number") return []
+    var names = []
+    for (var i = 0; i < raw.length; i++) names.push(String(raw[i]))
+    return names
   }
 
   function healthySeconds() {
@@ -69,12 +110,17 @@ Item {
     return Math.max(30, Number(setting("alertInterval", 60)) || 60)
   }
 
+  // The rare cadence is the default and the frequent one is the exception, so
+  // the exception is named rather than the default: only a fleet that is
+  // actually broken earns the fast poll. Muting everything is not a broken
+  // fleet, it is nothing to watch, and nothing to watch is the quiet case.
   function nextIntervalSeconds() {
     if (failures > 0) {
       var backoff = 60 * Math.pow(2, Math.min(failures - 1, 10))
       return Math.min(backoff, 600)
     }
-    return status === "green" ? healthySeconds() : alertSeconds()
+    if (status === "red" || status === "orange") return alertSeconds()
+    return healthySeconds()
   }
 
   function maybePoll() {
@@ -106,6 +152,10 @@ Item {
   // A server counts as online only on a literal boolean true. The site also
   // uses 2 for "ongoing issues", which is deliberately not online so a partial
   // outage reads orange rather than green.
+  //
+  // Muted servers stay in serverList so the panel can keep listing them, but
+  // they are left out of the counts and out of the verdict: a fleet the user
+  // is not watching must not paint their glyph.
   function apply(raw) {
     var payload
     try {
@@ -119,21 +169,31 @@ Item {
     var names = Object.keys(servers)
     if (names.length === 0) return false
 
+    var muted = mutedList()
     var online = 0
+    var monitored = 0
     var list = []
     for (var i = 0; i < names.length; i++) {
-      var value = servers[names[i]]
-      if (value === true) online++
+      var name = names[i]
+      var value = servers[name]
+      var isMuted = muted.indexOf(name) !== -1
       list.push({
-        name: names[i],
+        name: name,
         state: value === true ? "online" : (value === 2 ? "issues" : "offline")
       })
+      if (isMuted) continue
+      monitored++
+      if (value === true) online++
     }
 
-    totalCount = names.length
-    onlineCount = online
+    hasReading = true
+    // -1 already means "nothing to say about a count" to the bar and the
+    // panel, which is exactly what an all-muted fleet is, so an all-muted
+    // fleet needs no new state of its own.
+    onlineCount = monitored === 0 ? -1 : online
+    totalCount = monitored
     serverList = list
-    status = online === names.length ? "green" : (online === 0 ? "red" : "orange")
+    status = monitored === 0 ? "" : (online === monitored ? "green" : (online === 0 ? "red" : "orange"))
     return true
   }
 

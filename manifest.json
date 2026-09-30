@@ -24,7 +24,8 @@
       "healthyInterval": 300,
       "alertInterval": 60,
       "notifyRecovery": true,
-      "detail": false
+      "detail": false,
+      "mutedServers": []
     },
     "schema": [
       {

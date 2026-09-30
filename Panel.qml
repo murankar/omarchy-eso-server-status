@@ -4,6 +4,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "Theme.js" as Theme
+import "Servers.js" as Servers
 
 // The popout listing every server with its own status colour.
 //
@@ -25,12 +26,52 @@ Panel {
   readonly property var barIdentity: hostWidget || root
 
   readonly property var servers: service && service.serverList ? service.serverList : []
+
+  // The same rows in panel order: NA, then EU, then the public test server,
+  // each group alphabetical by display name. Sorted on a copy so the service's
+  // list stays in whatever order the site sent it.
+  readonly property var orderedServers: {
+    var rows = root.servers.slice()
+    rows.sort(Servers.compare)
+    return rows
+  }
+
+  // What the repeater actually walks: a heading per region, then its servers.
+  // Built here rather than with nested repeaters so one delegate draws both,
+  // and so a group heading cannot end up separated from its rows.
+  readonly property var serverRows: {
+    var out = []
+    var group = null
+    for (var i = 0; i < root.orderedServers.length; i++) {
+      var server = root.orderedServers[i]
+      var region = Servers.region(server.name)
+      if (region !== group) {
+        group = region
+        // A name carrying no region gets no heading: there is nothing to
+        // group it under, and an empty band above it would just be noise.
+        if (region !== "")
+          out.push({ heading: true, label: Servers.groupLabel(region) })
+      }
+      out.push({ heading: false, server: server, label: Servers.label(server.name) })
+    }
+    return out
+  }
   readonly property int onlineCount: service ? service.onlineCount : -1
   readonly property int totalCount: service ? service.totalCount : 0
   readonly property bool stale: service ? service.stale : false
+  readonly property bool hasReading: service ? service.hasReading : false
   // The service owns the real switch, so the toggle reflects what actually
   // gates the polls rather than just what is in the settings object.
   readonly property bool paused: service ? service.paused : root.boolSetting("paused", false)
+
+  // True when at least one server currently listed is muted. Derived from the
+  // live rows rather than from the stored list, so a name the site has since
+  // dropped does not keep the panel talking about a selection it cannot show.
+  readonly property bool anyMuted: {
+    for (var i = 0; i < root.servers.length; i++)
+      if (root.isMuted(root.servers[i].name)) return true
+    return false
+  }
 
   // Left click used to open the site, so the poll settings had nowhere to live
   // except a hand-edited shell.json. They get a tab now.
@@ -55,14 +96,75 @@ Panel {
   // on the next poll instead of waiting for the shell.json write to come back
   // through the bar. The service re-reads its intervals on every poll, so no
   // restart is needed.
+  //
+  // The write is seeded from the service's settings rather than this panel's
+  // own copy. More than one panel instance can be alive at once — the bar
+  // keeps a hidden one loaded next to the one in the popout — and only the
+  // service is updated by every write. Seeding from a stale instance would hand
+  // a later edit back an older entry and quietly drop an earlier one.
   function setSetting(key, value) {
+    var base = root.service && root.service.settings ? root.service.settings : root.settings
     var entry = { id: root.moduleName }
-    for (var k in root.settings) if (k !== "id") entry[k] = root.settings[k]
+    if (base) for (var k in base) if (k !== "id") entry[k] = base[k]
     entry[key] = value
     root.settings = entry
     if (root.service) root.service.settings = entry
     if (root.bar && root.bar.shell && typeof root.bar.shell.updateEntryInline === "function")
       root.bar.shell.updateEntryInline(root.moduleName, entry)
+  }
+
+  // The server names the user has switched off, straight out of the settings
+  // object the service also reads, so a row's switch and the glyph's verdict
+  // can never disagree about who is muted.
+  //
+  // Duck-typed, never Array.isArray(), for the reason given in Service.qml: the
+  // array crosses a JS realm boundary on its way in from the shell, and isArray
+  // answers false for a real array. The two copies of this guard have to agree
+  // or a switch stops matching its own row.
+  function mutedList() {
+    var raw = root.settings ? root.settings.mutedServers : undefined
+    if (!raw || typeof raw.length !== "number") return []
+    var names = []
+    for (var i = 0; i < raw.length; i++) names.push(String(raw[i]))
+    return names
+  }
+
+  // The list the next write is built from. The service copy is authoritative
+  // for the same reason setSetting seeds from it: this instance's own settings
+  // can be a write behind, and toggling off a stale list would put a server
+  // back on that another panel had just switched off.
+  function storedMutedList() {
+    var raw = root.service && root.service.settings ? root.service.settings.mutedServers : undefined
+    if (!raw && root.settings) raw = root.settings.mutedServers
+    if (!raw || typeof raw.length !== "number") return []
+    var names = []
+    for (var i = 0; i < raw.length; i++) names.push(String(raw[i]))
+    return names
+  }
+
+  // Read per row rather than carried on the polled server list, so a switch
+  // moves the instant it is clicked instead of a poll later. The poll it waits
+  // for only has to catch the counts and the verdict up.
+  function isMuted(name) {
+    return root.mutedList().indexOf(name) !== -1
+  }
+
+  // Copy before editing. The stored array is the same object the service holds
+  // and, in a binding, the one QML compares references on -- splicing it in
+  // place would rewrite the stored value and never notify anything.
+  //
+  // The refresh is forced for the same reason resuming from a pause forces
+  // one: the glyph is currently showing a verdict computed over a set the user
+  // has just changed, and leaving that on screen until the interval expires
+  // would mean showing a fleet the plugin has stopped watching. Mid-poll the
+  // service ignores this and the next poll settles it anyway.
+  function toggleMonitored(name) {
+    var list = root.storedMutedList()
+    var index = list.indexOf(name)
+    if (index === -1) list.push(name)
+    else list.splice(index, 1)
+    root.setSetting("mutedServers", list)
+    if (root.service) root.service.lastPollAt = 0
   }
 
 
@@ -84,11 +186,13 @@ Panel {
 
   // A server with reported problems reads amber, not red: it is still up.
   //
+  // Muted is checked first and is the only case that claims nothing at all.
   // Paused is checked before stale and deliberately takes the server name's
   // own colour. A coloured dot beside the word "paused" would be a state claim
   // the panel has withdrawn, so the whole row goes neutral: dot, status and
   // name all in barForeground. Nothing on screen can then be misread as live.
-  function colorForState(state) {
+  function colorForState(state, muted) {
+    if (muted) return root.dimmed
     if (root.paused) return bar.barForeground
     if (root.stale) return root.dimmed
     if (state === "online") return root.greenColor
@@ -99,15 +203,20 @@ Panel {
   // The panel never claims a freshness it does not have. A failed poll and a
   // paused poll both mean the counts below are last-known rather than current,
   // so both are said out loud instead of being shown as a live reading.
+  // Muting every server is the same kind of claim to refuse: the poll worked,
+  // and the answer is that nothing is being watched.
   function subtitle() {
-    if (root.onlineCount < 0) return "Waiting for first update"
-    var counts = root.onlineCount + " of " + root.totalCount + " servers online"
+    if (root.onlineCount < 0)
+      return root.hasReading ? "No servers monitored" : "Waiting for first update"
+    var counts = root.onlineCount + " of " + root.totalCount
+      + (root.anyMuted ? " monitored" : "") + " servers online"
     if (root.paused) return "Polling paused - " + counts
     if (root.stale) return "Could not reach esoserverstatus.net"
     return counts
   }
 
-  function textForState(state) {
+  function textForState(state, muted) {
+    if (muted) return "muted"
     if (root.paused) return "paused"
     if (root.stale) return "unknown"
     if (state === "online") return "online"
@@ -160,7 +269,13 @@ Panel {
 
         Text {
           text: root.subtitle()
-          color: (root.stale || root.paused) ? root.dimmed : Qt.rgba(bar.barForeground.r, bar.barForeground.g, bar.barForeground.b, 0.65)
+          // Accent when the count is a real reading, dimmed when it is not:
+          // a stale or paused fleet has no count worth drawing attention to,
+          // and tinting "could not reach esoserverstatus.net" would dress a
+          // failure up as a result.
+          color: (root.stale || root.paused || root.onlineCount < 0)
+            ? Qt.rgba(bar.barForeground.r, bar.barForeground.g, bar.barForeground.b, 0.65)
+            : Color.accent
           font.family: Style.fontFamily
           font.pixelSize: Style.font.caption
         }
@@ -221,53 +336,143 @@ Panel {
         visible: root.tab === 0
 
         // One row per server, coloured by its own state rather than the fleet's.
+        //
+        // The trailing switch is the row's own control, so the row owns the
+        // click and the switch is marked non-interactive: one input, one place
+        // that flips a server. Hover fill matches the site link below, so the
+        // clickable half of the tab looks the same in both places.
         Repeater {
-          model: root.servers
+          model: root.serverRows
 
           delegate: Rectangle {
+            id: serverRow
             required property var modelData
             required property int index
 
+            readonly property bool heading: modelData.heading === true
+            readonly property bool muted: !serverRow.heading
+              && root.isMuted(modelData.server.name)
+            // A heading row carries no server, so its state reads as absent.
+            // Every binding below uses this instead of reaching into
+            // modelData.server directly: an undefined read is a QML error on
+            // every heading, and errors on rows nobody is looking at still
+            // fill the journal.
+            readonly property string rowState: serverRow.heading
+              ? "" : modelData.server.state
+
+            // Server rows sit inside their region's heading rather than
+            // beside it, so the grouping reads as nesting instead of as two
+            // columns that happen to line up. Roughly four spaces at the body
+            // size, and on the theme's spacing scale so a roomier theme gets a
+            // roomier indent. Headings keep the flush-left edge they already
+            // had: they are the thing being indented away from.
+            readonly property int indent: serverRow.heading ? 0 : Style.space(14)
+
             width: serversTab.width
-            height: Style.space(26)
+            // A heading is a label for the rows under it, so it is shorter
+            // than a row and the column's own spacing gives it the air.
+            height: serverRow.heading ? Style.space(16) : Style.space(30)
             radius: Style.cornerRadius
-            color: "transparent"
+            color: !serverRow.heading && rowHover.hovered
+              ? Style.hoverFillFor(bar.barForeground, Color.accent)
+              : "transparent"
+
+            // Only a server row is clickable: a heading has no server behind
+            // it to toggle, and swallowing the click would silently do nothing.
+            HoverHandler {
+              id: rowHover
+              enabled: !serverRow.heading
+            }
+
+            TapHandler {
+              enabled: !serverRow.heading
+              onTapped: root.toggleMonitored(serverRow.modelData.server.name)
+            }
+
+            // The heading: the region name, plus a hairline to separate it from the
+            // group above. Sits flush left so it lines up with the server
+            // names rather than with the dots.
+            Text {
+              anchors.left: parent.left
+              anchors.leftMargin: Style.space(2)
+              anchors.right: parent.right
+              anchors.bottom: parent.bottom
+              anchors.bottomMargin: Style.space(1)
+              visible: serverRow.heading
+              text: modelData.label
+              elide: Text.ElideRight
+              // The theme's accent, not the status colour: a heading is
+              // structure, not a verdict, and a green heading next to a green
+              // "online" row would read as a server that is up.
+              color: Color.accent
+              font.family: Style.fontFamily
+              font.pixelSize: Style.font.caption
+              font.weight: Font.DemiBold
+              font.capitalization: Font.AllUppercase
+              font.letterSpacing: 0.6
+            }
 
             Rectangle {
               id: dot
+              visible: !serverRow.heading
               width: Style.space(8)
               height: Style.space(8)
               radius: width / 2
               anchors.left: parent.left
-              anchors.leftMargin: Style.space(2)
+              anchors.leftMargin: Style.space(2) + serverRow.indent
               anchors.verticalCenter: parent.verticalCenter
-              color: root.colorForState(modelData.state)
+              color: root.colorForState(serverRow.rowState, serverRow.muted)
             }
 
-            // Right-aligned, sitting clear of the border by the content inset
-            // plus this margin. The name is bounded by the status rather than
-            // the row edge, so the two cannot overlap when the label is the
-            // longer of the pair ("ongoing issues").
+            ToggleSwitch {
+              id: monitorSwitch
+              visible: !serverRow.heading
+              anchors.right: parent.right
+              anchors.rightMargin: serverRow.indent
+              anchors.verticalCenter: parent.verticalCenter
+              checked: !serverRow.muted
+              // The row handles the click; the switch only reports the value.
+              interactive: false
+              foreground: bar.barForeground
+            }
+
+            // Right-aligned, sitting clear of the switch by the gap the
+            // settings rows use between a label and its control. The name is
+            // bounded by the status rather than the row edge, so the two cannot
+            // overlap when the label is the longer of the pair ("ongoing
+            // issues").
+            //
+            // A heading states nothing, so it renders no status at all -- and
+            // not merely a hidden one. textForState falls through to "offline"
+            // for a state it does not recognise, so a heading that only set
+            // `visible: false` would still evaluate to "offline" beside NA and
+            // EU. Nothing draws it today, but the row would be one binding
+            // change away from claiming a server is down.
             Text {
               id: statusText
-              anchors.right: parent.right
-              anchors.rightMargin: Style.spacing.lg
+              visible: !serverRow.heading
+              anchors.right: monitorSwitch.left
+              anchors.rightMargin: Style.space(12)
               anchors.verticalCenter: parent.verticalCenter
-              text: root.textForState(modelData.state)
-              color: root.colorForState(modelData.state)
+              text: serverRow.heading
+                ? "" : root.textForState(serverRow.rowState, serverRow.muted)
+              color: root.colorForState(serverRow.rowState, serverRow.muted)
               font.family: Style.fontFamily
               font.pixelSize: Style.font.caption
             }
 
             Text {
+              visible: !serverRow.heading
               anchors.left: dot.right
               anchors.leftMargin: Style.space(10)
               anchors.right: statusText.left
               anchors.rightMargin: Style.space(10)
               anchors.verticalCenter: parent.verticalCenter
-              text: modelData.name
+              // The display name, not the payload key: the panel reads
+              // region-first while the settings still store the site's name.
+              text: modelData.label
               elide: Text.ElideRight
-              color: bar.barForeground
+              color: serverRow.muted ? root.dimmed : bar.barForeground
               font.family: Style.fontFamily
               font.pixelSize: Style.font.body
             }
@@ -294,9 +499,8 @@ Panel {
             id: siteHover
           }
 
-          Text {
-            anchors.left: parent.left
-            anchors.leftMargin: Style.space(2)
+Text {
+            anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             text: "Open esoserverstatus.net"
             color: bar.barForeground

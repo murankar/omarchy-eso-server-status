@@ -128,9 +128,77 @@ coloured by its own reported state rather than by the fleet as a whole:
 | `ongoing issues` | amber | The service reported `2`: reachable, but impaired |
 | `offline` | red | The service reported `false` |
 | `unknown` | dimmed | The last poll failed, so no state is being claimed |
+| `muted` | dimmed | The row's switch is off, so this server is not being watched |
 
 Amber is deliberately distinct from red: a server reporting ongoing issues is
 still up, and collapsing the two would overstate the severity.
+
+#### Names and grouping
+
+Rows are grouped by region — `NA`, then `EU`, then the public test server. The
+heading names the region once, so the rows under it name only the device:
+
+```
+NA
+PC
+PlayStation
+XBOX
+EU
+PC
+PlayStation
+XBOX
+Public Test Server
+PC-PTS
+```
+
+The site keys its payload device-first (`PC-NA`, `PS4-EU`, `XBOX-NA`), so `PC`
+under `NA` is `PC-NA` and `PlayStation` is `PS4-NA`. Repeating the region on
+every row would say the same thing seven times; the heading is the place for it.
+
+`PS4` is shown as `PlayStation`, which is the name the console is sold under.
+A device the plugin has no name for keeps the site's own, and a region it does
+not recognise still gets a heading and sorts after the test server rather than
+being dropped.
+
+The public test server is the exception and keeps the name the site gives it:
+it is a single server rather than a region, so it is not renamed to `PC` and
+its group is labelled for what it is.
+
+Headings are drawn in the theme's accent colour, as is the `7 of 7 servers
+online` count. They carry no status text — a heading is not a server, so
+nothing next to `NA` or `EU` claims to be online or offline.
+
+Only the display name changes. `mutedServers` still stores the site's own keys,
+so a switch you flipped before this existed keeps pointing at the same server.
+
+Each row also carries a switch. Leaving a server on watches it; switching it
+off **mutes** it: the server is dropped from the `N of M` count and from the
+green/amber/red verdict that colours the bar glyph, and its row goes dim and
+says `muted` rather than claiming a state nobody is watching. If you only play
+on North America, a European outage then costs you nothing — the glyph stays
+green and the count reads `1 of 1 servers online`.
+
+Muting is per server and nothing else: the poll still runs, and it still
+returns the whole fleet in one response, so muting never changes how many
+requests the plugin makes. It does change the cadence, in the direction you
+want — a fleet that is only broken on servers you have muted is not treated as
+an incident, so it does not trigger the 60-second poll.
+
+A muted row says `muted` and goes dim, in the same way a paused one does. A
+coloured dot next to a server the plugin is not watching would be a claim the
+plugin has withdrawn.
+
+Two details worth knowing:
+
+- **Muting is a deny-list**, stored as `mutedServers` in your
+  `~/.config/omarchy/shell.json`. An install that never touched the switches
+  has no key at all and monitors everything, and a server the site adds later
+  arrives monitored rather than silently switched off by a list that never
+  mentioned it.
+- **Switching every server off is allowed.** There is nothing to report, so the
+  glyph goes plain, the tooltip says `no servers monitored`, and the panel
+  header says the same — rather than the widget vanishing and taking the
+  switches with it. The fleet is back one click away.
 
 The panel opens under the bar entry, closes on outside click, on `Escape`, and
 via the shell's normal panel dismissal, and carries its own link to the site so
@@ -144,7 +212,7 @@ the DNS provider row in the network panel, so the two read as the same control:
 
 | Tab | Contents |
 |---|---|
-| **Servers** | The seven-server list, plus the site link |
+| **Servers** | The seven-server list with a per-server monitor switch, plus the site link |
 | **Settings** | The four polling settings below |
 
 ### Settings
@@ -198,12 +266,15 @@ per interval rather than three.
 
 **Asymmetric cadence.** A healthy machine polls rarely; the frequent cadence is
 spent only while an incident is actually open, which is the only window where
-freshness matters to a user.
+freshness matters to a user. "Incident" means a monitored server is unhappy, so
+muting the servers you do not play on also keeps the rare cadence in place when
+they are not.
 
 | Situation | Interval | Requests/day |
 |---|---|---|
-| All servers online | 300s | 288 |
-| Incident open | 60s | 1440 |
+| All monitored servers online | 300s | 288 |
+| Incident open among monitored servers | 60s | 1440 |
+| Nothing monitored | 300s | 288 |
 | Endpoint unreachable | 60 → 600s backoff | 144 |
 
 **Exponential backoff** on transport failure (60, 120, 240, 480, 600s), so an
@@ -211,7 +282,8 @@ offline network cannot turn the widget into a request flood.
 
 **A stale reading never lies.** If a poll fails the last known status is kept
 but the glyph drops to the neutral foreground colour, so a dead endpoint cannot
-read as "all clear".
+read as "all clear". Muted servers are treated the same way: the widget knows
+they are being polled and is choosing not to judge them.
 
 ## Privacy and network behaviour
 
@@ -279,6 +351,7 @@ Service.qml    one per shell process; owns the Process, the Timer, and all state
 BarWidget.qml  per bar surface; reads published state, renders, handles input
 Panel.qml      per bar surface; the popout list, a view onto the same service
 Theme.js       hue-aware colour selection from the active theme's palette
+Servers.js     display names and region grouping for the server list
 manifest.json  plugin metadata and the settings schema
 ```
 

@@ -23,14 +23,24 @@ BarWidget {
   readonly property int totalCount: service ? service.totalCount : 0
   readonly property bool stale: service ? service.stale : false
   readonly property bool paused: service ? service.paused : false
+  // A poll has landed at least once, whatever it said. Tracked separately from
+  // a non-empty status because an all-muted fleet is a real reading with
+  // nothing to report, and hiding the widget would take the panel's own switch
+  // rows with it -- the one thing a user who muted everything needs to undo it.
+  readonly property bool hasReading: service ? service.hasReading : false
+  readonly property bool nothingMonitored: root.hasReading && root.totalCount === 0
 
   // Paused outranks the count: "polling paused" is the honest reading even
   // with detail on, because the count is last-known rather than current.
+  // Nothing-monitored outranks detail for the same reason: there is no count
+  // to be more specific about.
   readonly property string statusSuffix: root.paused
     ? "polling paused"
-    : (setting("detail", false) && root.onlineCount >= 0
-      ? root.onlineCount + "/" + root.totalCount + " online"
-      : "")
+    : (root.nothingMonitored
+      ? "no servers monitored"
+      : (setting("detail", false) && root.onlineCount >= 0
+        ? root.onlineCount + "/" + root.totalCount + " online"
+        : ""))
 
   readonly property var palette: Theme.parsePalette(paletteFile.text())
 
@@ -46,14 +56,17 @@ BarWidget {
   // known red/green, or the glyph would claim a live status it does not have.
   // Paused and stale look the same on purpose -- the glyph should stop being a
   // status light rather than grow a new state, and the tooltip and the panel
-  // header say which of the two it is.
-  readonly property color statusColor: (stale || paused) ? (bar ? bar.barForeground : Color.foreground)
+  // header say which of the two it is. Muting every server looks the same for
+  // the same reason: there is no longer anything for the colour to mean.
+  readonly property color statusColor: (stale || paused || nothingMonitored) ? (bar ? bar.barForeground : Color.foreground)
     : status === "green" ? greenColor
     : status === "red" ? redColor
     : status === "orange" ? orangeColor
     : (bar ? bar.barForeground : Color.foreground)
 
-  visible: status !== ""
+  // Hidden only until a poll has actually landed, so the bar never shows an
+  // empty slot during startup. Everything after that is a state worth showing.
+  visible: root.hasReading
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
