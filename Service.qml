@@ -45,10 +45,34 @@ Item {
   // clicked.
   property var serverList: []
 
-  // True when the last fetch failed. The last known status is kept so the bar
-  // can still render something, but the widget shows it neutrally rather than
-  // claiming a freshness we no longer have.
-  property bool stale: false
+  // Split in two so staleness can be judged from the clock as well as from the
+  // last outcome. `failed` is a fact about a poll that reported back; `overdue`
+  // is a fact about time, and it is the only one that can notice a poll which
+  // never reported back at all.
+  property bool failed: false
+  property bool overdue: false
+
+  // What the bar and the panel read. Unchanged for both of them: the point is
+  // that "we do not have a current reading" is one question, and it is answered
+  // by either a failed poll or a reading that has aged out.
+  readonly property bool stale: root.failed || root.overdue
+
+  // Stamped when a response parses. The clock is read against this rather than
+  // against lastPollAt, which is stamped when a poll *starts* and therefore
+  // says nothing about whether one ever finished.
+  property double lastGoodAt: 0
+
+  // The largest fleet worth believing. The panel builds a delegate per server,
+  // twice over (two Panel instances stay live), so an unbounded count is a way
+  // to make the bar do tens of thousands of layout passes on the UI thread.
+  // 256 is orders of magnitude above the seven servers the site runs today.
+  readonly property int maxServers: 256
+
+  // A response body this long is refused before it is parsed, so the JSON.parse
+  // itself is bounded even on a curl too old for --max-filesize to apply (that
+  // option had no effect at all for an unknown-length response before 8.4.0).
+  // 64 KiB against a document that is ~124 bytes today.
+  readonly property int maxBodyChars: 65536
 
   // User-facing poll switch. While paused the last known status is held rather
   // than refreshed, which is the point: the user asked to spend no requests.
@@ -67,6 +91,15 @@ Item {
   property bool settled: false
   property bool everReported: false
   property double lastPollAt: 0
+
+  // When the poll now in flight started, so an outstanding fetch that never
+  // reports back can be timed out rather than trusted.
+  property double pollStartedAt: 0
+
+  // --max-time gives curl 10s to give up on its own. A poll that is still
+  // outstanding 5s after that is not going to report: something failed to line
+  // up, and the honest reading is a failed poll.
+  readonly property double pollTimeoutSeconds: 15
 
   // The verdict as it stood when the in-flight poll was *started*.
   //
@@ -142,30 +175,65 @@ Item {
   }
 
   function maybePoll() {
-    if (paused || settled || fetch.running) return
+    if (paused) {
+      // Paused is its own honest state and the UI already shows it as one, so a
+      // long pause must not also age the last reading into "stale". Otherwise
+      // resuming would show a failure that is really just an old reading.
+      overdue = false
+      return
+    }
+
+    // Recomputed here rather than in a binding because Date.now() is not a
+    // binding dependency: nothing would ever re-evaluate it. The 2s tick calls
+    // this, and `overdue` is a plain property, so bindings on `stale` do hear
+    // about it.
+    overdue = lastGoodAt > 0
+      && Date.now() / 1000 - lastGoodAt > nextIntervalSeconds() * 1.5
+
+    if (fetch.running) return
+
+    // A poll that outlived --max-time plus a margin never reported back. settle()
+    // is the only thing that clears `settled`, and it runs solely from
+    // onStreamFinished or onExited -- so a fetch that fails to produce either
+    // would otherwise stop polling for the rest of the session while the bar
+    // went on painting its last known colour. Fail it by hand, and stop the
+    // process so the next tick is free to poll again.
+    if (settled && pollStartedAt > 0
+      && Date.now() / 1000 - pollStartedAt > pollTimeoutSeconds) {
+      fetch.running = false
+      settle(false)
+    }
+
+    if (settled) return
     if (Date.now() / 1000 - lastPollAt < nextIntervalSeconds()) return
     lastPollAt = Date.now() / 1000
+    pollStartedAt = lastPollAt
     statusBeforePoll = status
     settled = true
     fetch.running = true
   }
+
 
   // Single funnel for both outcomes: curl's exit signal and its stdout
   // completion race each other, and one fetch must never be counted twice.
   function settle(ok) {
     if (!settled) return
     settled = false
+    pollStartedAt = 0
 
     if (ok) {
       failures = 0
-      stale = false
+      failed = false
+      overdue = false
+      lastGoodAt = Date.now() / 1000
       if (root.wasDown && setting("notifyRecovery", true)) announceRecovery()
       everReported = true
     } else {
       failures++
-      stale = true
+      failed = true
     }
   }
+
 
   // A server counts as online only on a literal boolean true. The site also
   // uses 2 for "ongoing issues", which is deliberately not online so a partial
