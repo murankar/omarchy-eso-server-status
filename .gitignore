@@ -9,6 +9,9 @@ Thumbs.db
 
 # Private production notes; deliberately never published
 ProjectNotes-BaseApp.md
+ProjectNotes-CodeReview.md
+ProjectNotes-Fixes.md
+ProjectNotes-Optimizations.md
 ProductionNotes-AddPanel.md
 ProjectNotes-UICorrections.md
 TODO.md
