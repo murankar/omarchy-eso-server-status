@@ -104,6 +104,13 @@ Panel {
   // a later edit back an older entry and quietly drop an earlier one.
   function setSetting(key, value) {
     var base = root.service && root.service.settings ? root.service.settings : root.settings
+    // Nothing to do when the value already is the value we would write. This is
+    // not only about the coalescing below: setSetting is also reached from
+    // handlers that can fire without a user having changed anything, and a
+    // redundant write is a redundant read/clone/write of shell.json plus a
+    // settings reassignment on both the panel and the service.
+    if (base && Object.prototype.hasOwnProperty.call(base, key)
+      && String(base[key]) === String(value)) return
     var entry = { id: root.moduleName }
     if (base) for (var k in base) if (k !== "id") entry[k] = base[k]
     entry[key] = value
@@ -111,6 +118,68 @@ Panel {
     if (root.service) root.service.settings = entry
     if (root.bar && root.bar.shell && typeof root.bar.shell.updateEntryInline === "function")
       root.bar.shell.updateEntryInline(root.moduleName, entry)
+  }
+
+  // A NumberField commits per keystroke: Ui/NumberField.qml wires
+  // onValueModified straight to its modified() signal, and a SpinBox clamps as
+  // its text is parsed. Typing 3600 into a field with from:120 therefore
+  // commits 120, 120, 360, 3600 -- and the first two are not the number the
+  // user was ever going to choose, they are what the field fell back to while
+  // the text was still too short to be in range. Each of those is a full
+  // shell.json round trip, and the transient 120 briefly becomes the live poll
+  // interval.
+  //
+  // So a numeric commit is held, not written: one pending value per key, the
+  // newest replacing the one before it.
+  property var pendingInterval: ({})
+
+  function queueInterval(key, value) {
+    var next = {}
+    for (var k in root.pendingInterval) next[k] = root.pendingInterval[k]
+    next[key] = value
+    root.pendingInterval = next
+    intervalCommit.restart()
+  }
+
+  // Deliberately skipped while a field still has focus. A mid-edit value is not
+  // a choice, and the moment the user looks away from the field the real value
+  // is written instead -- so "commit on editing finished" falls out of this
+  // without having to reach into the SpinBox's internals.
+  function flushInterval() {
+    if (root.intervalFieldFocused) return
+    var pending = root.pendingInterval
+    if (!Object.prototype.hasOwnProperty.call(pending, "healthyInterval")
+      && !Object.prototype.hasOwnProperty.call(pending, "alertInterval")) return
+    root.pendingInterval = ({})
+    for (var key in pending) root.setSetting(key, pending[key])
+  }
+
+  // Through the NumberField's own `field` alias, so this stays a property of
+  // what the stock control exposes rather than of its implementation.
+  readonly property bool intervalFieldFocused:
+    (!!healthyField.field && healthyField.field.activeFocus)
+    || (!!alertField.field && alertField.field.activeFocus)
+
+  // Backstop for a value typed and then abandoned by closing the panel while the
+  // field kept focus: closing drops activeFocus, which reaches flushInterval
+  // through the handlers below, and this catches anything that slips past.
+  onOpenedChanged: if (!root.opened) flushInterval()
+
+  // A settings object arriving from outside -- the bar widget re-injecting on
+  // service or bar arrival -- would otherwise re-evaluate the field's `value`
+  // binding and snap a half-typed number back to the stored one, discarding the
+  // edit. The pending value is written first, so the injection is the later of
+  // the two. No recursion: the write empties pendingInterval, and the second
+  // pass finds nothing to flush.
+  onSettingsChanged: flushInterval()
+
+  // The quiet-period flush. Short enough that stepper clicks -- which change the
+  // value without the field taking focus, so nothing else will flush them --
+  // land almost immediately, and long enough to swallow a burst of typing.
+  Timer {
+    id: intervalCommit
+    interval: 500
+    onTriggered: root.flushInterval()
   }
 
   // The server names the user has switched off, straight out of the settings
@@ -605,7 +674,17 @@ Text {
             foreground: bar.barForeground
             fontFamily: Style.fontFamily
             fontSize: Style.font.bodySmall
-            onModified: function(v) { root.setSetting("healthyInterval", v) }
+            onModified: function(v) { root.queueInterval("healthyInterval", v) }
+            // Looking away from the field is the commit point. Wired to the
+            // inner SpinBox through NumberField's own `field` alias rather than
+            // to focus on the row, so a click elsewhere in the panel does not
+            // read as finishing an edit and a Tab away from the field does.
+            Connections {
+              target: healthyField.field
+              function onActiveFocusChanged() {
+                if (!healthyField.field.activeFocus) root.flushInterval()
+              }
+            }
           }
 
           Text {
@@ -637,7 +716,13 @@ Text {
             foreground: bar.barForeground
             fontFamily: Style.fontFamily
             fontSize: Style.font.bodySmall
-            onModified: function(v) { root.setSetting("alertInterval", v) }
+            onModified: function(v) { root.queueInterval("alertInterval", v) }
+            Connections {
+              target: alertField.field
+              function onActiveFocusChanged() {
+                if (!alertField.field.activeFocus) root.flushInterval()
+              }
+            }
           }
 
           Text {
