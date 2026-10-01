@@ -142,11 +142,27 @@ Panel {
     return names
   }
 
+  // Muted names as a lookup, built once per settings change rather than rebuilt
+  // on every call. isMuted() is read twice by every row delegate and once more
+  // per row by anyMuted, so building the array inside it made a poll cost
+  // O(rows x muted) *allocations* on the UI thread -- the same shape of problem
+  // as an unbounded fleet, just smaller.
+  //
+  // A null prototype, so a server the endpoint chose to call "constructor" or
+  // "__proto__" cannot reach Object.prototype and read as muted. The `=== true`
+  // test is kept for the same reason: it is the only value that counts.
+  readonly property var mutedLookup: {
+    var lookup = Object.create(null)
+    var names = root.mutedList()
+    for (var i = 0; i < names.length; i++) lookup[names[i]] = true
+    return lookup
+  }
+
   // Read per row rather than carried on the polled server list, so a switch
   // moves the instant it is clicked instead of a poll later. The poll it waits
   // for only has to catch the counts and the verdict up.
   function isMuted(name) {
-    return root.mutedList().indexOf(name) !== -1
+    return root.mutedLookup[name] === true
   }
 
   // Copy before editing. The stored array is the same object the service holds
