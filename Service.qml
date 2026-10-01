@@ -45,6 +45,10 @@ Item {
   // clicked.
   property var serverList: []
 
+  // True when the last fetch failed. The last known status is kept so the bar
+  // can still render something, but the widget shows it neutrally rather than
+  // claiming a freshness we no longer have.
+  //
   // Split in two so staleness can be judged from the clock as well as from the
   // last outcome. `failed` is a fact about a poll that reported back; `overdue`
   // is a fact about time, and it is the only one that can notice a poll which
@@ -213,7 +217,6 @@ Item {
     fetch.running = true
   }
 
-
   // Single funnel for both outcomes: curl's exit signal and its stdout
   // completion race each other, and one fetch must never be counted twice.
   function settle(ok) {
@@ -234,7 +237,6 @@ Item {
     }
   }
 
-
   // A server counts as online only on a literal boolean true. The site also
   // uses 2 for "ongoing issues", which is deliberately not online so a partial
   // outage reads orange rather than green.
@@ -243,9 +245,14 @@ Item {
   // they are left out of the counts and out of the verdict: a fleet the user
   // is not watching must not paint their glyph.
   function apply(raw) {
+    // Bounded before the parse, not after: the body is untrusted and a parse of
+    // a hostile document is itself work. See maxBodyChars.
+    var text = String(raw === undefined || raw === null ? "" : raw).trim()
+    if (text.length > root.maxBodyChars) return false
+
     var payload
     try {
-      payload = JSON.parse(String(raw || "").trim())
+      payload = JSON.parse(text)
     } catch (e) {
       return false
     }
@@ -254,6 +261,7 @@ Item {
     if (!servers || typeof servers !== "object") return false
     var names = Object.keys(servers)
     if (names.length === 0) return false
+    if (names.length > root.maxServers) return false
 
     var muted = mutedList()
     var online = 0
@@ -293,7 +301,33 @@ Item {
   Process {
     id: fetch
     running: false
+    // --max-time bounds how long a poll may run; --max-filesize bounds how many
+    // bytes the collector can be made to buffer, which the timeout does not.
+    // Both are needed: a hostile or compromised endpoint can deliver far more
+    // than memory in well under ten seconds, and because it sends no
+    // Content-Length a size check after collection would already be too late --
+    // the shell would have died holding it. Measured against a 64 MiB streamed
+    // body with no Content-Length: without this flag it collects in full and
+    // exits 0, so the timeout alone bounds nothing.
+    //
+    // curl aborts the transfer once the running total *reaches* the threshold,
+    // which is not the same as a per-chunk ceiling and is why the total cannot
+    // overshoot: measured at exactly 1048576 bytes. It exits 63, which lands in
+    // settle(false) and backs off like any other transport failure.
+    //
+    // The floor, which this option's protection depends on: before curl 8.4.0
+    // it has no effect at all on a response whose size is not known before the
+    // download starts, and a body with no Content-Length is exactly what this
+    // endpoint sends. Arch and Omarchy ship far past that (8.22 here), but a
+    // user on an older distro would get no protection at all from this flag.
+    // maxBodyChars in apply() is the backstop for that case: the body is
+    // refused before JSON.parse, so the parse is bounded even where the
+    // collector's buffer was not.
+    //
+    // The document is ~124 bytes today, so 1 MiB is four orders of magnitude of
+    // headroom rather than a guess at real size.
     command: ["curl", "-fsS", "--max-time", "10",
+      "--max-filesize", "1048576",
       "-H", "X-Requested-With: XMLHttpRequest",
       "-H", "Accept: application/json",
       root.apiUrl]
