@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "murankar.eso-server-status",
   "name": "ESO Server Status",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "author": "Matthias Urankar",
   "description": "Elder Scrolls Online server status indicator with shared, outage-aware polling",
   "kinds": [
@@ -15,7 +15,7 @@
   },
   "barWidget": {
     "displayName": "ESO Server Status",
-    "description": "Green when all 7 ESO servers are online, red when all are offline, orange otherwise",
+    "description": "Green when every ESO server is online, red when all are offline, orange otherwise",
     "category": "Info",
     "allowMultiple": false,
     "defaultSection": "right",

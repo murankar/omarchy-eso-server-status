@@ -258,7 +258,12 @@ Item {
     }
 
     var servers = payload && payload.servers
-    if (!servers || typeof servers !== "object") return false
+    // Not duck-typed like the settings arrays below, because that workaround is
+    // specific to a value crossing a JS realm boundary on its way in from the
+    // shell. This one is parsed here, from the response body, so Array.isArray
+    // answers correctly for it -- and has to be asked, because typeof [] is
+    // "object" and an array here yields two rows named 0 and 1.
+    if (!servers || typeof servers !== "object" || Array.isArray(servers)) return false
     var names = Object.keys(servers)
     if (names.length === 0) return false
     if (names.length > root.maxServers) return false
@@ -340,7 +345,15 @@ Item {
     //
     // The document is ~124 bytes today, so 1 MiB is four orders of magnitude of
     // headroom rather than a guess at real size.
-    command: ["curl", "-fsS", "--max-time", "10",
+    //
+    // -q first, so a ~/.curlrc cannot quietly change what this invocation means:
+    // an rc carrying -k or --insecure would turn off the certificate
+    // verification the README claims is left enabled, and --proxy or --netrc
+    // would redirect the request. As the first argument it also disables the
+    // rc before curl reads it. This is what makes "one endpoint, nothing else"
+    // and "certificate verification stays on" properties of the plugin rather
+    // than of the user's rc.
+    command: ["curl", "-q", "-fsS", "--max-time", "10",
       "--max-filesize", "1048576",
       "-H", "X-Requested-With: XMLHttpRequest",
       "-H", "Accept: application/json",

@@ -25,6 +25,12 @@ Panel {
 
   readonly property var barIdentity: hostWidget || root
 
+  // So `omarchy shell summon|hide|toggle murankar.eso-server-status` reaches this
+  // panel. Ui/Panel.qml gates its IpcHandler on this being non-empty, and every
+  // stock bar-widget panel sets it, so without it the plugin is the only one on
+  // the bar that cannot be summoned from a hotkey or script.
+  ipcTarget: "murankar.eso-server-status"
+
   readonly property var servers: service && service.serverList ? service.serverList : []
 
   // The same rows in panel order: NA, then EU, then the public test server,
@@ -102,6 +108,19 @@ Panel {
   // keeps a hidden one loaded next to the one in the popout — and only the
   // service is updated by every write. Seeding from a stale instance would hand
   // a later edit back an older entry and quietly drop an earlier one.
+  // Overrides the base implementation, which passes the panel itself to the bar.
+  // Ui/Panel.qml:32-35 calls bar.switchPanelFrom(root, ...), and the bar resolves
+  // its slot by slot.activeItem === owner -- where the owner is the bar widget,
+  // not this panel. Passing barIdentity is what makes the panel-switch keys find
+  // their slot. Every stock nested panel does this the same way
+  // (clock/Panel.qml:113-117, weather/Panel.qml:59-63); without it the keys
+  // silently do nothing.
+  function switchPanel(direction) {
+    if (root.bar && typeof root.bar.switchPanelFrom === "function")
+      return root.bar.switchPanelFrom(root.barIdentity, direction)
+    return false
+  }
+
   function setSetting(key, value) {
     var base = root.service && root.service.settings ? root.service.settings : root.settings
     // Nothing to do when the value already is the value we would write. This is
@@ -278,7 +297,7 @@ Panel {
   // name all in barForeground. Nothing on screen can then be misread as live.
   function colorForState(state, muted) {
     if (muted) return root.dimmed
-    if (root.paused) return bar.barForeground
+    if (root.paused) return barForeground
     if (root.stale) return root.dimmed
     if (state === "online") return root.greenColor
     if (state === "issues") return root.orangeColor
@@ -346,7 +365,7 @@ Panel {
 
         Text {
           text: "ESO Server Status"
-          color: bar.barForeground
+          color: barForeground
           font.family: Style.fontFamily
           font.pixelSize: Style.font.title
           font.weight: Font.DemiBold
@@ -359,7 +378,7 @@ Panel {
           // and tinting "could not reach esoserverstatus.net" would dress a
           // failure up as a result.
           color: (root.stale || root.paused || root.onlineCount < 0)
-            ? Qt.rgba(bar.barForeground.r, bar.barForeground.g, bar.barForeground.b, 0.65)
+            ? Qt.rgba(barForeground.r, barForeground.g, barForeground.b, 0.65)
             : Color.accent
           font.family: Style.fontFamily
           font.pixelSize: Style.font.caption
@@ -368,7 +387,7 @@ Panel {
 
       PanelSeparator {
         width: parent.width
-        foreground: bar.barForeground
+        foreground: barForeground
       }
 
       // Tab pills, built the same way as the network panel's DNS provider row
@@ -387,7 +406,7 @@ Panel {
           width: tabRow.cellWidth
           active: root.tab === 0
           bordered: true
-          foreground: bar.barForeground
+          foreground: barForeground
           fontFamily: Style.fontFamily
           fontSize: Style.font.bodySmall
           horizontalPadding: Style.spacing.controlPaddingX
@@ -400,7 +419,7 @@ Panel {
           width: tabRow.cellWidth
           active: root.tab === 1
           bordered: true
-          foreground: bar.barForeground
+          foreground: barForeground
           fontFamily: Style.fontFamily
           fontSize: Style.font.bodySmall
           horizontalPadding: Style.spacing.controlPaddingX
@@ -411,7 +430,7 @@ Panel {
 
       PanelSeparator {
         width: parent.width
-        foreground: bar.barForeground
+        foreground: barForeground
       }
 
       Column {
@@ -459,7 +478,7 @@ Panel {
             height: serverRow.heading ? Style.space(16) : Style.space(30)
             radius: Style.cornerRadius
             color: !serverRow.heading && rowHover.hovered
-              ? Style.hoverFillFor(bar.barForeground, Color.accent)
+              ? Style.hoverFillFor(barForeground, Color.accent)
               : "transparent"
 
             // Only a server row is clickable: a heading has no server behind
@@ -526,7 +545,7 @@ Panel {
               checked: !serverRow.muted
               // The row handles the click; the switch only reports the value.
               interactive: false
-              foreground: bar.barForeground
+              foreground: barForeground
             }
 
             // Right-aligned, sitting clear of the switch by the gap the
@@ -569,7 +588,7 @@ Panel {
               textFormat: Text.PlainText
               text: modelData.label
               elide: Text.ElideRight
-              color: serverRow.muted ? root.dimmed : bar.barForeground
+              color: serverRow.muted ? root.dimmed : barForeground
               font.family: Style.fontFamily
               font.pixelSize: Style.font.body
             }
@@ -578,7 +597,7 @@ Panel {
 
         PanelSeparator {
           width: parent.width
-          foreground: bar.barForeground
+          foreground: barForeground
         }
 
         // Reachable without leaving the panel, since left click no longer opens
@@ -589,7 +608,7 @@ Panel {
           height: Style.space(24)
           radius: Style.cornerRadius
           color: siteHover.hovered
-            ? Style.hoverFillFor(bar.barForeground, Color.accent)
+            ? Style.hoverFillFor(barForeground, Color.accent)
             : "transparent"
 
           HoverHandler {
@@ -600,7 +619,7 @@ Text {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             text: "Open esoserverstatus.net"
-            color: bar.barForeground
+            color: barForeground
             font.family: Style.fontFamily
             font.pixelSize: Style.font.caption
             font.underline: siteHover.hovered
@@ -634,7 +653,7 @@ Text {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             checked: root.paused
-            foreground: bar.barForeground
+            foreground: barForeground
             onToggled: root.setSetting("paused", !root.paused)
           }
 
@@ -645,7 +664,7 @@ Text {
             anchors.verticalCenter: parent.verticalCenter
             text: "Pause polling"
             elide: Text.ElideRight
-            color: bar.barForeground
+            color: barForeground
             font.family: Style.fontFamily
             font.pixelSize: Style.font.body
           }
@@ -671,7 +690,7 @@ Text {
             to: 3600
             stepSize: 30
             value: root.intSetting("healthyInterval", 300)
-            foreground: bar.barForeground
+            foreground: barForeground
             fontFamily: Style.fontFamily
             fontSize: Style.font.bodySmall
             onModified: function(v) { root.queueInterval("healthyInterval", v) }
@@ -694,7 +713,7 @@ Text {
             anchors.verticalCenter: parent.verticalCenter
             text: "Healthy poll (s)"
             elide: Text.ElideRight
-            color: bar.barForeground
+            color: barForeground
             font.family: Style.fontFamily
             font.pixelSize: Style.font.body
           }
@@ -713,7 +732,7 @@ Text {
             to: 1800
             stepSize: 30
             value: root.intSetting("alertInterval", 60)
-            foreground: bar.barForeground
+            foreground: barForeground
             fontFamily: Style.fontFamily
             fontSize: Style.font.bodySmall
             onModified: function(v) { root.queueInterval("alertInterval", v) }
@@ -732,7 +751,7 @@ Text {
             anchors.verticalCenter: parent.verticalCenter
             text: "Incident poll (s)"
             elide: Text.ElideRight
-            color: bar.barForeground
+            color: barForeground
             font.family: Style.fontFamily
             font.pixelSize: Style.font.body
           }
@@ -747,7 +766,7 @@ Text {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             checked: root.boolSetting("notifyRecovery", true)
-            foreground: bar.barForeground
+            foreground: barForeground
             onToggled: root.setSetting("notifyRecovery", !root.boolSetting("notifyRecovery", true))
           }
 
@@ -758,7 +777,7 @@ Text {
             anchors.verticalCenter: parent.verticalCenter
             text: "Notify on recovery"
             elide: Text.ElideRight
-            color: bar.barForeground
+            color: barForeground
             font.family: Style.fontFamily
             font.pixelSize: Style.font.body
           }
@@ -773,7 +792,7 @@ Text {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             checked: root.boolSetting("detail", false)
-            foreground: bar.barForeground
+            foreground: barForeground
             onToggled: root.setSetting("detail", !root.boolSetting("detail", false))
           }
 
@@ -784,7 +803,7 @@ Text {
             anchors.verticalCenter: parent.verticalCenter
             text: "Count in tooltip"
             elide: Text.ElideRight
-            color: bar.barForeground
+            color: barForeground
             font.family: Style.fontFamily
             font.pixelSize: Style.font.body
           }

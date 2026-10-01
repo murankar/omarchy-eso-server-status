@@ -11,6 +11,8 @@ according to the health of the Elder Scrolls Online server fleet.
 | Red | all 7 servers offline | total outage |
 | (neutral) | last reading is stale | the endpoint could not be reached |
 
+Upgrading? See [Patch Notes](Patch-Notes.md) for what changed in each version.
+
 ## Screenshots
 
 ![The per-server panel, opened by left-clicking the bar entry](preview.png)
@@ -213,7 +215,7 @@ the DNS provider row in the network panel, so the two read as the same control:
 | Tab | Contents |
 |---|---|
 | **Servers** | The seven-server list with a per-server monitor switch, plus the site link |
-| **Settings** | The four polling settings below |
+| **Settings** | The five polling settings below |
 
 ### Settings
 
@@ -370,6 +372,8 @@ to the service itself need `omarchy restart shell` rather than the usual
 automatic reload.
 
 ## Development
+
+Changes are recorded in [Patch Notes](Patch-Notes.md), newest version first.
 
 ```bash
 omarchy plugin validate ~/.config/omarchy/plugins/murankar.eso-server-status
