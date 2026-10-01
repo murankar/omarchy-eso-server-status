@@ -399,6 +399,14 @@ Panel {
               anchors.bottom: parent.bottom
               anchors.bottomMargin: Style.space(1)
               visible: serverRow.heading
+              // Plain text, never rich: a heading is a region name taken
+              // straight from the payload, and Qt's default (AutoText) would
+              // let the endpoint hand us markup. A <img src="..."> in a name
+              // is not inert -- Qt's rich-text loader fetches it, which is an
+              // outbound request to a host of the endpoint's choosing, once per
+              // poll. Servers.plain() is the second line of defence; this is
+              // the one that actually holds.
+              textFormat: Text.PlainText
               text: modelData.label
               elide: Text.ElideRight
               // The theme's accent, not the status colour: a heading is
@@ -470,6 +478,10 @@ Panel {
               anchors.verticalCenter: parent.verticalCenter
               // The display name, not the payload key: the panel reads
               // region-first while the settings still store the site's name.
+              // Plain text for the same reason as the heading above: this is
+              // the label a hostile endpoint controls most directly, since any
+              // string with no usable region reaches label() verbatim.
+              textFormat: Text.PlainText
               text: modelData.label
               elide: Text.ElideRight
               color: serverRow.muted ? root.dimmed : bar.barForeground

@@ -20,6 +20,17 @@
 var REGIONS = ["NA", "EU"]
 var TEST_REGION = "PTS"
 
+// Anything outside this set is dropped from a *displayed* name.
+//
+// A server name is remote data, and the panel renders it with Text.PlainText
+// precisely so it cannot be markup. This is the belt to that braces: a name is
+// the only place untrusted text reaches the UI at all, so keeping it to a
+// name-shaped alphabet here means junk from a compromised endpoint never gets
+// that far. Applied to the label only -- the payload key itself is untouched, so
+// `mutedServers` entries keep matching the key they were stored against.
+var UNSAFE = /[^A-Za-z0-9 _.-]/g
+var UNNAMED = "Unknown"
+
 // Names as the panel shows them. A device missing from this table keeps its own
 // name, so an unknown console gets a row rather than a blank one.
 var DEVICES = { "PS4": "PlayStation" }
@@ -41,26 +52,36 @@ function isTest(region) {
   return region === TEST_REGION
 }
 
+// Reduce a remote string to something that can only be a name. A name that is
+// entirely stripped is reported as unknown rather than passed through, so a
+// payload of pure markup cannot reach the label by having nothing left to
+// remove.
+function plain(value) {
+  var text = String(value === undefined || value === null ? "" : value)
+  var cleaned = text.replace(UNSAFE, "")
+  return cleaned === "" ? UNNAMED : cleaned
+}
+
 // The display name: the device alone, because the region is already the
 // heading it sits under. Repeating it on every row in the group would say the
 // same thing seven times. The test server is returned untouched, by name, and
 // keeps its own prefix -- it is not in a region group.
 function label(name) {
   var parts = split(name)
-  if (!parts || isTest(parts.region)) return String(name)
-  return deviceLabel(parts.device)
+  if (!parts || isTest(parts.region)) return plain(name)
+  return plain(deviceLabel(parts.device))
 }
 
 // The region a server groups under, or "" when the name carries none.
 function region(name) {
   var parts = split(name)
-  return parts ? parts.region : ""
+  return parts ? plain(parts.region) : ""
 }
 
 // The heading shown above a group.
 function groupLabel(regionText) {
   if (isTest(regionText)) return "Public Test Server"
-  return String(regionText)
+  return plain(regionText)
 }
 
 // NA, then EU, then the test server, then whatever the site adds later.
