@@ -68,6 +68,24 @@ Item {
   property bool everReported: false
   property double lastPollAt: 0
 
+  // The verdict as it stood when the in-flight poll was *started*.
+  //
+  // settle() cannot read `status` to answer "were we down a moment ago",
+  // because apply() assigns the new status at the end of its own run and
+  // onStreamFinished evaluates root.settle(root.apply(text)) -- so apply()
+  // finishes first and `status` already holds the answer. Comparing the new
+  // verdict against itself made the recovery check fire on the way *down* and
+  // stay silent on the way up. Snapshot taken before the fetch starts.
+  property string statusBeforePoll: ""
+
+  // The question settle() actually has to answer: was the fleet down the last
+  // time we looked? Read off the snapshot, because by the time settle() runs
+  // apply() has already put the *new* verdict in `status` -- reading that
+  // instead compared the answer with itself, which announced recovery on the
+  // way down and stayed quiet on the way up.
+  readonly property bool wasDown: everReported
+    && statusBeforePoll !== "" && statusBeforePoll !== "green"
+
   // True once a response has parsed, whatever it said. Distinct from a
   // non-empty `status`, which is also false when every server is muted: the
   // bar stays on screen and says "no servers monitored" rather than
@@ -127,6 +145,7 @@ Item {
     if (paused || settled || fetch.running) return
     if (Date.now() / 1000 - lastPollAt < nextIntervalSeconds()) return
     lastPollAt = Date.now() / 1000
+    statusBeforePoll = status
     settled = true
     fetch.running = true
   }
@@ -138,10 +157,9 @@ Item {
     settled = false
 
     if (ok) {
-      var wasDown = everReported && status !== "" && status !== "green"
       failures = 0
       stale = false
-      if (wasDown && setting("notifyRecovery", true)) announceRecovery()
+      if (root.wasDown && setting("notifyRecovery", true)) announceRecovery()
       everReported = true
     } else {
       failures++
