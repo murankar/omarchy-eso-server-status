@@ -263,14 +263,28 @@ Item {
     if (names.length === 0) return false
     if (names.length > root.maxServers) return false
 
+    // A lookup rather than muted.indexOf() per server: this is the same
+    // O(servers x muted) shape the panel was moved off of, and here it runs on
+    // every poll instead of only on a settings change. maxServers caps the
+    // outer term, but the cap is a backstop against a hostile document, not a
+    // reason to leave the work quadratic.
+    //
+    // A null prototype, so a server the endpoint chose to call "constructor" or
+    // "__proto__" cannot reach Object.prototype and read as muted -- the names
+    // come from the payload, so unlike the settings list they are not ours to
+    // constrain. The `=== true` test is kept for the same reason as in the
+    // panel: it is the only value that counts.
     var muted = mutedList()
+    var mutedSet = Object.create(null)
+    for (var m = 0; m < muted.length; m++) mutedSet[muted[m]] = true
+
     var online = 0
     var monitored = 0
     var list = []
     for (var i = 0; i < names.length; i++) {
       var name = names[i]
       var value = servers[name]
-      var isMuted = muted.indexOf(name) !== -1
+      var isMuted = mutedSet[name] === true
       list.push({
         name: name,
         state: value === true ? "online" : (value === 2 ? "issues" : "offline")
