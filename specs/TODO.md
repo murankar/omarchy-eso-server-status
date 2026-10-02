@@ -63,9 +63,9 @@ response-size concern at `f13906f` and then withdrew it, having found no
 attacker-controlled input or allocation amplification in the fixed publisher
 API.
 
-The snapshot is now behind `main` at `2c598ef` (1.4.1), so the listing reads
-`Update unverified` until a newer commit is verified through the plugin
-verification form. Installs still clone mutable `HEAD`, so users already
+The verified snapshot is still 1.4.0 at `f669178`, behind `main`, so the
+listing reads `Update unverified` until a newer commit is verified through the
+plugin verification form. Installs still clone mutable `HEAD`, so users already
 receive 1.4.1 code; only the verified snapshot label lags.
 
 The original draft is kept in this directory as `MARKETPLACE-SUBMISSION.md`.
