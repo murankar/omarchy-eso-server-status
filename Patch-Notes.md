@@ -22,6 +22,17 @@ they are tracked instead of ignored.
 marketplace submission record. This changes what the published repository
 contains, not what the plugin does.
 
+`specs/` holds eight files: `MARKETPLACE-SUBMISSION.md`, `TODO.md`,
+`ProductionNotes-AddPanel.md`, `ProjectNotes-BaseApp.md`,
+`ProjectNotes-CodeReview.md`, `ProjectNotes-Fixes.md`,
+`ProjectNotes-Optimizations.md`, and `ProjectNotes-UICorrections.md`.
+
+Three of these were named in `.gitignore` but had never existed in the tracked
+tree. They existed only in the locally installed plugin checkout, so they are
+being published for the first time here. Anyone depending on this repository
+should treat the notes as working documents rather than specification — they
+were written for one machine and one installation.
+
 The only functional file touched is `manifest.json`, and only its `version`
 field. `Service.qml`, `Panel.qml`, `BarWidget.qml`, `Servers.js`, and
 `Theme.js` are unchanged from 1.4.0, so the security and resource bounds

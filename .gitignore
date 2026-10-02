@@ -4,10 +4,8 @@
 .DS_Store
 Thumbs.db
 
+# Obsidian vault config for this checkout
+.obsidian/
+
 # Local scratch
 *.log
-
-# Project notes and specs live in specs/ and are tracked
-ProjectNotes-CodeReview.md
-ProjectNotes-Fixes.md
-ProjectNotes-Optimizations.md
