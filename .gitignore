@@ -7,12 +7,7 @@ Thumbs.db
 # Local scratch
 *.log
 
-# Private production notes; deliberately never published
-ProjectNotes-BaseApp.md
+# Project notes and specs live in specs/ and are tracked
 ProjectNotes-CodeReview.md
 ProjectNotes-Fixes.md
 ProjectNotes-Optimizations.md
-ProductionNotes-AddPanel.md
-ProjectNotes-UICorrections.md
-TODO.md
-MARKETPLACE-SUBMISSION.md

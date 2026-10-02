@@ -7,6 +7,29 @@ for users of that version; the commit history has the implementation detail.
 
 ---
 
+## 1.4.1 — 2026-10-02
+
+A repository-layout release. No plugin code changed and no setting moved,
+changed default, or left the schema, so an existing install needs no action.
+
+The working notes that lived at the repository root are now in `specs/`, and
+they are tracked instead of ignored.
+
+### Repository layout
+
+**`specs/` is new.** The production notes, project notes, and TODO that
+`.gitignore` previously excluded are now committed under it, together with the
+marketplace submission record. This changes what the published repository
+contains, not what the plugin does.
+
+The only functional file touched is `manifest.json`, and only its `version`
+field. `Service.qml`, `Panel.qml`, `BarWidget.qml`, `Servers.js`, and
+`Theme.js` are unchanged from 1.4.0, so the security and resource bounds
+described below still apply exactly as written.
+
+Anyone tracking this repository as a dependency should note that 1.4.1 is a
+larger clone than 1.4.0 by roughly 2,200 lines of notes.
+
 ## 1.4.0 — 2026-10-01
 
 A security and correctness release. No new features and no new settings; every

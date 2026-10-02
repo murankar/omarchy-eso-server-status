@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "murankar.eso-server-status",
   "name": "ESO Server Status",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "author": "Matthias Urankar",
   "description": "Elder Scrolls Online server status indicator with shared, outage-aware polling",
   "kinds": [
